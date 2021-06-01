@@ -50,7 +50,7 @@ var stats={
                         type: 'time',
                         time: {
                             displayFormats: {
-                                second: 'hh:mm:ss',
+                                second: 'mm:ss',
                             },
                         },
                         ticks: {
@@ -72,6 +72,8 @@ var stats={
 	    sensorctx.text=L.tooltip({permanent:true,direction:'center',className:'tooltip_text'});
         var offset={x:0,y:0};
         var div=$('<div class="page-stats" draggable="true"><canvas class="max-size"></canvas></div>').on('dragstart', function (e) {
+            if (sensorctx.chart_icon) sensorctx.chart_icon.closePopup();
+
             var divoffset=$(this).offset();
             offset={x:e.pageX-divoffset.left,y:e.pageY-divoffset.top};
             e.originalEvent.dataTransfer.setData('application/json',JSON.stringify(sensor));
@@ -90,7 +92,7 @@ var stats={
 
                 div1.append('<a class="leaflet-popup-close-button front" href="javascript:void(0)">x</a>');
                 div1.find('a').click(function() {
-                    marker1.remove();
+                    page.data('stat').layer.removeLayer(marker1);
                 });
             });
         });
@@ -137,10 +139,12 @@ var stats={
         chart.config.options.legend.display=(datasets.length<4);
         chart.update();
     },
-    update: function (layer, sensorctx, zoom, sensor, data, loc) {
-        var count=0;
-        for (var k in data) 
-            count=count+data[k];
+    update: function (layer, sensorctx, zoom, sensor, data1, loc) {
+        var count=0, data={};
+        for (var k in data1) {
+            count=count+data1[k];
+            data[text.translate(k)]=data1[k];
+        }
         stats.update_chart(sensorctx.chart, data);
         layer.eachLayer(function (layer1) {
             if (!layer1._sensor || !layer1._chart) return;

@@ -1,27 +1,14 @@
 #!/usr/bin/python3
 
-import requests
-import time
-import json
+from db_common import DBCommon
 from dsl_yacc import compile, check_nested_label
+from language_dsl import text
+import json
 
-class DBQuery(object):
+class DBQuery(DBCommon):
     def __init__(self, index, office, host):
-        super(DBQuery,self).__init__()
-        self._host=host
-        indexes=index.split(",")
-        if isinstance(office,list): office='$'+('$'.join(map(str,office)))
-        self._index=indexes[0]+office
-        self._include_type_name={"include_type_name":"false"}
-        self._where=indexes[1]+office if len(indexes)>1 else None
-
-    def _check_error(self, r):
-        if r.status_code==200 or r.status_code==201: return
-        try:
-            reason=r.json()["error"]["reason"]
-        except:
-            r.raise_for_status()
-        raise Exception(reason)
+        super(DBQuery,self).__init__(index, office, host)
+        self._error=text["query error"]
 
     def _spec_from_mapping(self, spec, prefix, properties):
         for field in properties:
@@ -35,54 +22,40 @@ class DBQuery(object):
             if "properties" in properties[field]:
                 self._spec_from_mapping(spec, prefix+field+".", properties[field]["properties"])
 
-    def _spec_from_index(self, specs, index):
-        specs.append({"nested":[],"types":{}})
-        r=requests.get(self._host+"/"+index+"/_mapping",params=self._include_type_name)
-        if r.status_code!=200: return
-        r=r.json()
+    def _spec_from_index(self):
+        spec={"nested":[],"types":{}}
+        r=self._request(self._requests.get,self._host+"/"+self._index+"/_mapping",params=self._include_type_name)
         for index1 in r: 
-            self._spec_from_mapping(specs[-1],"",r[index1]["mappings"]["properties"])
+            self._spec_from_mapping(spec,"",r[index1]["mappings"]["properties"])
+        return spec
 
-    def _specs(self):
-        specs=[]
-        self._spec_from_index(specs,self._index)
-        if self._where: self._spec_from_index(specs,self._where)
-        return specs
-
-    def search(self, queries, size=10000, where_size=200):
-        dsl=compile(queries,self._specs())
-        query=dsl[0]
-        if len(dsl)>1:
-            r=requests.post(self._host+"/"+self._where+"/_search",json={"query":dsl[1],"size":0,"aggs":{ "recording": { "terms": { "field": "recording.keyword", "min_doc_count": 1, "size": where_size }}}})
-            self._check_error(r)
-            ids=[x["key"] for x in r.json()["aggregations"]["recording"]["buckets"]]
-            query={"bool":{"must":[query,{"ids":{"values":ids}}]}}
-        r=requests.post(self._host+"/"+self._index+"/_search",json={"query":query,"size":size, "seq_no_primary_term": True})
-        self._check_error(r)
-        for x in r.json()["hits"]["hits"]:
+    def search(self, queries, size=10000, spec=None):
+        if spec is None: spec=self._spec_from_index()
+        dsl=compile(queries,spec)
+        r=self._request(self._requests.post,self._host+"/"+self._index+"/_search",json={"query":dsl,"size":size, "seq_no_primary_term": True})
+        for x in r["hits"]["hits"]:
             yield x
 
-    def count(self,queries):
-        dsl={ "query": compile(queries,self._specs())[0] }
-        r=requests.post(self._host+"/"+self._index+"/_count",json=dsl)
-        self._check_error(r)
-        return r.json()["count"]
+    def count(self, queries, spec=None):
+        if spec is None: spec=self._spec_from_index()
+        dsl={ "query": compile(queries,spec) }
+        r=self._request(self._requests.post,self._host+"/"+self._index+"/_count",json=dsl)
+        return r["count"]
 
-    def stats(self, queries, fields):
-        specs=self._specs()
-        dsl=compile(queries,specs)
-        query={"query":dsl[0],"aggs":{},"size":0}
+    def stats(self, queries, fields, spec=None):
+        if spec is None: spec=self._spec_from_index()
+        dsl=compile(queries,spec)
+        query={"query":dsl,"aggs":{},"size":0}
         for field in fields:
-            nested,var=check_nested_label(specs[0],field)
+            nested,var=check_nested_label(spec,field)
             # nested aggs
             aggs={"stats":{"field":var, "missing":0}}
             if nested: 
                 for nest1 in nested:
                     aggs={"nested":{"path":nest1},"aggs":{field:aggs}}
             query["aggs"][field]=aggs
-        r=requests.post(self._host+"/"+self._index+"/_search",json=query)
-        self._check_error(r)
-        aggs=r.json()["aggregations"]
+        r=self._request(self._requests.post,self._host+"/"+self._index+"/_search",json=query)
+        aggs=r["aggregations"]
         data={}
         for field in fields:
             values=aggs
@@ -100,19 +73,17 @@ class DBQuery(object):
             if isinstance(r[k],dict):
                 self._scan_bucket(buckets,r[k])
 
-    def _bucketize(self, queries, fields, size, specs):
-        if not specs: specs=self._specs()
-
-        dsl=compile(queries,specs)[0] if queries else {"match_all":{}} 
+    def _bucketize(self, queries, fields, size, spec):
+        dsl=compile(queries,spec) if queries else {"match_all":{}} 
         dsl={"query":dsl,"aggs":{},"size":0}
 
         for field in fields:
-            nested,var=check_nested_label(specs[0],field)
+            nested,var=check_nested_label(spec,field)
 
             # replace text field with field.keyword
-            if "types" in specs[0]:
-                if var in specs[0]["types"]:
-                    if specs[0]["types"][var]=="text":
+            if "types" in spec:
+                if var in spec["types"]:
+                    if spec["types"][var]=="text":
                         var=var+".keyword"
             # nested aggs
             aggs={"terms":{"field":var, "size":size}}
@@ -122,29 +93,26 @@ class DBQuery(object):
             dsl["aggs"][field]=aggs
 
         # bucketize
-        r=requests.post(self._host+"/"+self._index+"/_search",json=dsl)
-        self._check_error(r)
+        r=self._request(self._requests.post,self._host+"/"+self._index+"/_search",json=dsl)
 
         # summariz results
         buckets={}
-        aggs=r.json()["aggregations"]
+        aggs=r["aggregations"]
         for field in aggs:
             buckets[field]={}
             self._scan_bucket(buckets[field],aggs[field])
         return buckets
 
-    def bucketize(self, queries, fields, size=25):
-        specs=self._specs()
-        return self._bucketize(queries,fields,size,specs)
+    def bucketize(self, queries, fields, size=25, spec=None):
+        if spec is None: spec=self._spec_from_index()
+        return self._bucketize(queries,fields,size,spec)
 
     def update(self, _id, info, seq_no=None, primary_term=None):
         options={}
         if seq_no is not None: options["if_seq_no"]=seq_no
         if primary_term is not None: options["if_primary_term"]=primary_term
-        r=requests.post(self._host+"/"+self._index+"/_doc/"+_id+"/_update",params=options,json={"doc":info})  #ES6.8
-        #r=requests.post(self._host+"/"+self._index+"/_update/"+_id,params=options,json={"doc":info})  #ES7.4
-        self._check_error(r)
-        return r.json()
+        return self._request(self._requests.post,self._host+"/"+self._index+"/_doc/"+_id+"/_update",params=options,json={"doc":info})  #ES6.8
+        return self._request(self._requests.post,self._host+"/"+self._index+"/_update/"+_id,params=options,json={"doc":info})  #ES7.4
 
     def update_bulk(self, updates, batch=500):
         """ update in a bulk:
@@ -162,26 +130,22 @@ class DBQuery(object):
             updates=updates[batch:]
 
             cmds="\n".join([json.dumps(x) for x in cmds])+"\n"
-            r=requests.post(self._host+"/_bulk",data=cmds,headers={"content-type":"application/x-ndjson"})
-            self._check_error(r)
+            self._request(self._requests.post,self._host+"/_bulk",data=cmds,headers={"content-type":"application/x-ndjson"})
 
-    def delete(self, _id):
-        r=requests.delete(self._host+"/"+self._index+"/_doc/"+_id,headers={'Content-Type':'application/json'})
-        self._check_error(r)
-        return r.json()
-
-    def hints(self, size=50):
-        specs=self._specs()
+    def hints(self, size=50, spec=None):
+        if spec is None: spec=self._spec_from_index()
         keywords={}
         fields=[]
 
-        types=specs[0]["types"]
-        for var in types:
-            keywords[var]={"type":types[var]}
-            if types[var]=="text": 
-                fields.append(var)
+        if "types" in spec:
+            types=spec["types"]
+            for var in types:
+                keywords[var]={"type":types[var]}
+                if types[var]=="text": 
+                    if var!="md5" and var!="passcode": #exclude from hints
+                        fields.append(var)
 
-        values=self._bucketize(None,fields,size,specs)
+        values=self._bucketize(None,fields,size,spec)
         for var in values:
             keywords[var]["values"]=list(values[var].keys())
         return keywords

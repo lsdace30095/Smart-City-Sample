@@ -22,16 +22,17 @@ function draw_analytics(video, doc) {
             if (tid!=video.data('last_draw')) {
                 video.data('last_draw',tid);
 
-                svg.empty();
+                svghtml="";
                 if (tid in timed) {
+                    var sx=svg.width()/video[0].videoWidth;
+                    var sy=svg.height()/video[0].videoHeight;
+                    var sxy=Math.min(sx,sy);
+                    var sw=sxy*video[0].videoWidth;
+                    var sh=sxy*video[0].videoHeight;
+                    var sxoff=(svg.width()-sw)/2;
+                    var syoff=(svg.height()-sh)/2;
+
                     $.each(timed[tid], function (x,v) {
-                        var sx=svg.width()/v._source.resolution.width;
-                        var sy=svg.height()/v._source.resolution.height;
-                        var sxy=Math.min(sx,sy);
-                        var sw=sxy*v._source.resolution.width;
-                        var sh=sxy*v._source.resolution.height;
-                        var sxoff=(svg.width()-sw)/2;
-                        var syoff=(svg.height()-sh)/2;
                         $.each(v._source.objects, function (x1, v1) {
                             if ("detection" in v1) {
                                 if ("bounding_box" in v1.detection) {
@@ -40,27 +41,16 @@ function draw_analytics(video, doc) {
                                     var ymin=v1.detection.bounding_box.y_min*sh;
                                     var ymax=v1.detection.bounding_box.y_max*sh;
                                     if (xmin!=xmax && ymin!=ymax) {
-                                        svg.append($(document.createElementNS(svg.attr('xmlns'),"rect")).attr({
-                                            x:sxoff+xmin,
-                                            y:syoff+ymin,
-                                            width:xmax-xmin,
-                                            height:ymax-ymin,
-                                            stroke:colors_label[v1.detection.label],
-                                            "stroke-width":1,
-                                            fill:"none",
-                                        }));
                                         var id=("id" in v1)?":#"+v1.id+":":":";
-                                        svg.append($(document.createElementNS(svg.attr('xmlns'),"text")).attr({
-                                            x:sxoff+xmin,
-                                            y:syoff+ymin,
-                                            fill: ("id" in v1)?colors_id[v1.id%colors_id.length]:"cyan",
-                                        }).text(v1.detection.label+id+Math.floor(v1.detection.confidence*100)+"%"));
+                                        var track_id=("track_id" in v1)?v1.track_id+":":":";
+                                        svghtml=svghtml+'<rect x="'+(sxoff+xmin)+'" y="'+(syoff+ymin)+'" width="'+(xmax-xmin)+'" height="'+(ymax-ymin)+'" stroke="'+colors_label[v1.detection.label]+'" stroke-width="1" fill="none"></rect><text x="'+(sxoff+xmin)+'" y="'+(syoff+ymin)+'" fill="'+(("id" in v1)?colors_id[v1.id%colors_id.length]:"cyan")+'">'+track_id+(text.translate(v1.detection.label)+id+Math.floor(v1.detection.confidence*100)+"%")+'</text>';
                                     }
                                 }
                             }
                         });
                     });
                 }
+                svg.html(svghtml);
             }
             if (video[0].paused) return video.data("time_offset",0);
             requestAnimationFrame(draw);

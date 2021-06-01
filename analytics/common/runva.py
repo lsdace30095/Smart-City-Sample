@@ -1,19 +1,19 @@
 #!/usr/bin/python3
 
-import os
 from paho.mqtt.client import Client
 from db_ingest import DBIngest
 from threading import Event
 from vaserving.vaserving import VAServing
 from vaserving.pipeline import Pipeline
+from configuration import env
 import time
 import traceback
 import psutil
 
-mqtthost = os.environ["MQTTHOST"]
-dbhost = os.environ["DBHOST"]
-every_nth_frame = int(os.environ["EVERY_NTH_FRAME"])
-office = list(map(float, os.environ["OFFICE"].split(",")))
+mqtthost = env["MQTTHOST"]
+dbhost = env["DBHOST"]
+every_nth_frame = int(env["EVERY_NTH_FRAME"])
+office = list(map(float, env["OFFICE"].split(",")))
 
 class RunVA(object):
     def _test_mqtt_connection(self):
@@ -24,28 +24,25 @@ class RunVA(object):
                 mqtt.connect(mqtthost)
                 break
             except:
-                print(traceback.format_exc(), flush=True)
+                print("Waiting for mqtt...", flush=True)
                 time.sleep(5)
         print("mqtt connected", flush=True)
         mqtt.disconnect()
     
-    def __init__(self, pipeline, version="2"):
+    def __init__(self, pipeline, version="2", stop=Event()):
         super(RunVA, self).__init__()
         self._test_mqtt_connection()
 
         self._pipeline = pipeline
         self._version = version
         self._db = DBIngest(host=dbhost, index="algorithms", office=office)
-        self._stop=None
-
+        self._stop=stop
 
     def stop(self):
-        if self._stop: 
-            print("stopping", flush=True)
-            self._stop.set()
+        print("stopping", flush=True)
+        self._stop.set()
 
-    def loop(self, sensor, location, uri, algorithm, algorithmName,
-             resolution={"width": 0, "height": 0}, zonemap=[], topic="analytics"):
+    def loop(self, sensor, location, uri, algorithm, algorithmName, options={}, topic="analytics"):
         try:
             VAServing.start({
                 'model_dir': '/home/models',
@@ -77,15 +74,7 @@ class RunVA(object):
                     "inference-interval": every_nth_frame,
                     "recording_prefix": "/tmp/rec/" + sensor
                 }
-
-                if algorithmName == "crowd-counting":
-                    parameters.update({
-                        "crowd_count": {
-                            "width": resolution["width"],
-                            "height": resolution["height"],
-                            "zonemap": zonemap,
-                        }
-                    })
+                parameters.update(options)
 
                 pipeline = VAServing.pipeline(self._pipeline, self._version)
                 instance_id = pipeline.start(source=source,
@@ -97,7 +86,7 @@ class RunVA(object):
                     raise Exception("Pipeline {} version {} Failed to Start".format(
                         self._pipeline, self._version))
 
-                self._stop=Event()
+                self._stop.clear()
                 while not self._stop.is_set():
                     status = pipeline.status()
                     print(status, flush=True)
@@ -112,15 +101,20 @@ class RunVA(object):
                         avg_pipeline_latency = status.avg_pipeline_latency
                         if not avg_pipeline_latency: avg_pipeline_latency = 0
 
-                        self._db.update(algorithm, {
-                            "sensor": sensor,
-                            "performance": status.avg_fps,
-                            "latency": avg_pipeline_latency * 1000,
-                            "cpu": psutil.cpu_percent(),
-                            "memory": psutil.virtual_memory().percent,
-                        })
+                        try:
+                            self._db.update(algorithm, {
+                                "sensor": sensor,
+                                "performance": status.avg_fps,
+                                "latency": avg_pipeline_latency * 1000,
+                                "cpu": psutil.cpu_percent(),
+                                "memory": psutil.virtual_memory().percent,
+                            })
+                        except:
+                            print("Failed to update algorithm status", flush=True)
+                            self._stop.set()
+                            raise
 
-                    self._stop.wait(1)
+                    self._stop.wait(3)
 
                 self._stop=None
                 pipeline.stop()

@@ -3,22 +3,23 @@
 from tornado import web, gen
 from tornado.concurrent import run_on_executor
 from concurrent.futures import ThreadPoolExecutor
-from urllib.parse import unquote_plus
+from urllib.parse import unquote
 from signal import signal, SIGTERM
 from db_query import DBQuery
 from db_ingest import DBIngest
 from probe import probe, run
+from language import text
+from configuration import env
 import datetime
 import time
-import base64
 import psutil
 import os
 
-dbhost=os.environ["DBHOST"]
-local_office=True if "OFFICE" in os.environ else False
-halt_rec_th=float(os.environ["HALT_REC"])
-fatal_disk_th=float(os.environ["FATAL_DISK"])
-warn_disk_th=float(os.environ["WARN_DISK"])
+dbhost=env["DBHOST"]
+local_office=True if "OFFICE" in env else False
+halt_rec_th=float(env["HALT_REC"])
+fatal_disk_th=float(env["FATAL_DISK"])
+warn_disk_th=float(env["WARN_DISK"])
 
 class UploadHandler(web.RequestHandler):
     def __init__(self, app, request, **kwargs):
@@ -39,10 +40,10 @@ class UploadHandler(web.RequestHandler):
             os.makedirs(mp4path,exist_ok=True)
             mp4file=mp4path+"/"+str(timestamp)+".mp4"
 
+            # perform a straight copy to fix negative timestamp for chrome
             list(run(["/usr/local/bin/ffmpeg","-f","mp4","-i",path,"-c","copy",mp4file]))
-            list(run(["/usr/local/bin/ffmpeg","-i",mp4file,"-vf","scale=640:360","-frames:v","1",mp4file+".png"]))
-            sinfo=probe(mp4file)
 
+            sinfo=probe(mp4file)
             sinfo.update({
                 "sensor": sensor,
                 "office": {
@@ -58,23 +59,18 @@ class UploadHandler(web.RequestHandler):
 
         if local_office:
             if sinfo:
-                # calculate total bandwidth
-                bandwidth=0
-                for stream1 in sinfo["streams"]:
-                    if "bit_rate" in stream1:
-                        bandwidth=bandwidth+stream1["bit_rate"]
-                if bandwidth: 
+                if "bandwidth" in sinfo:
                     db_cam=DBQuery(host=dbhost, index="sensors", office=office)
-                    db_cam.update(sensor, {"bandwidth": bandwidth})
+                    db_cam.update(sensor, {"bandwidth": sinfo["bandwidth"]})
 
             # check disk usage and send alert
             disk_usage=psutil.disk_usage(self._storage).percent
             if disk_usage>=warn_disk_th:
                 level="fatal" if disk_usage>=fatal_disk_th else "warning"
                 db_alt=DBIngest(host=dbhost, index="alerts", office=office)
-                message="Halt recording: disk "+str(disk_usage)+"%" if disk_usage>=halt_rec_th else "Disk usage: "+str(disk_usage)+"%"
+                message=text["halt recording"].format(disk_usage) if disk_usage>=halt_rec_th else text["disk usage"].format(disk_usage)
                 db_alt.ingest({
-                    "time": int(time.mktime(datetime.datetime.now().timetuple())*1000),
+                    "time": int(time.time()*1000),
                     "office": {
                         "lat": office[0],
                         "lon": office[1],
@@ -91,22 +87,29 @@ class UploadHandler(web.RequestHandler):
                     }]
                 })
 
-            # ingest recording local
-            if sinfo:
-                db_rec=DBIngest(host=dbhost, index="recordings", office=office)
-                db_rec.ingest(sinfo)
-        else:
-            # ingest recording cloud
-            if sinfo:
-                db_rec=DBIngest(host=dbhost, index="recordings_c", office="")
-                db_rec.ingest(sinfo)
+        # ingest recording local
+        if sinfo:
+            print("Ingest recording: {}".format(sinfo), flush=True)
+            office1=office if local_office else ""
 
+            # denormalize sensor address to recordings
+            dbs=DBQuery(host=dbhost, index="sensors", office=office1)
+            r=list(dbs.search("_id='"+sinfo["sensor"]+"'",size=1))
+            if r: sinfo["address"]=r[0]["_source"]["address"]
+
+            db_rec=DBIngest(host=dbhost, index="recordings", office=office1)
+            db_rec.ingest(sinfo)
+                        
     @gen.coroutine
     def post(self):
         office=list(map(float,self.get_body_argument('office').split(",")))
+        print("office = {}".format(office), flush=True)
         sensor=self.get_body_argument('sensor')
+        print("sensor = {}".format(sensor), flush=True)
         timestamp=int(self.get_body_argument('time'))
+        print("timestamp = {}".format(timestamp), flush=True)
         path=self.get_body_argument('file.path')
+        print("file.path = {}".format(path), flush=True)
         yield self._rec2db(office, sensor, timestamp, path)
         self.set_status(400, "Return 400 to remove this file")
 

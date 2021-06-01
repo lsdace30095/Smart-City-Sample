@@ -1,4 +1,6 @@
 
+{{- if contains $.Values.buildScope "cloud" }}
+
 apiVersion: v1
 kind: Service
 metadata:
@@ -9,7 +11,10 @@ spec:
   ports:
     - port: 443
       targetPort: 8443
-      name: https
+      name: https1
+    - port: 8443
+      targetPort: 9443
+      name: https2
   externalIPs:
     - {{ .Values.cloudWebExternalIP }}
   selector:
@@ -31,6 +36,8 @@ spec:
       labels:
         app: cloud-web
     spec:
+      securityContext:
+        fsGroup: {{ $.Values.groupId }}
       enableServiceLinks: false
       containers:
         - name: cloud-web
@@ -38,17 +45,14 @@ spec:
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8443
+            - containerPort: 9443
           env:
             - name: DBHOST
-              value: "http://{{ include "smtc.db.name" . }}-service:9200"
+              value: {{ printf "http://%s-service:9200" (include "smtc.db.name" .) | quote }}
+            - name: GWHOST
+              value: "http://cloud-gateway-service:8080"
             - name: SCENARIO
               value: {{ join "," $.Values.scenario | quote }}
-            - name: HEALTH_CHECK
-              {{- if gt (int .Values.noffices) 1 }}
-              value: "enabled"
-              {{- else }}
-              value: "disabled"
-              {{- end }}
             - name: NO_PROXY
               value: "*"
             - name: no_proxy
@@ -60,6 +64,27 @@ spec:
             - mountPath: /var/run/secrets
               name: self-signed-certificate
               readOnly: true
+{{- if (len $.Values.connector.cloudHost) }}
+        - name: cloud-web-tunnel
+          image: {{ $.Values.registryPrefix }}smtc_ssh_tunnel:latest
+          imagePullPolicy: IfNotPresent
+          env:
+{{- range $scenarioIdx, $scenarioName := $.Values.scenario }}
+{{- $args := dict "scenarioName" $scenarioName "Values" $.Values }}
+{{- range $officeIdx := until ( int ( include "smtc.noffices" $args ) ) }}
+{{- $officeIdx2 := add (mul $officeIdx (len $.Values.scenario)) $scenarioIdx }}
+            - name: "FORWARD_TUNNEL{{ $officeIdx2 }}"
+              value: "{{ $.Values.connector.cloudHost }}:{{ add $.Values.connector.officeGatewayPort $officeIdx2 }} localhost:{{ add $.Values.connector.officeGatewayPort $officeIdx2 }}"
+{{- end }}
+{{- end }}
+          volumeMounts:
+            - mountPath: /etc/localtime
+              name: timezone
+              readOnly: true
+            - mountPath: /etc/hostkey
+              name: hostkey
+              readOnly: true
+{{- end }}
       volumes:
         - name: timezone
           hostPath:
@@ -68,4 +93,12 @@ spec:
         - name: self-signed-certificate
           secret:
             secretName: self-signed-certificate
+{{- if (len $.Values.connector.cloudHost) }}
+        - name: hostkey
+          secret:
+            secretName: tunnel-secret
+            defaultMode: 0440
+{{- end }}
       {{ include "smtc.platform.node-selector" . }}
+
+{{- end }}

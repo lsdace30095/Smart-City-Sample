@@ -3,74 +3,67 @@
 from db_ingest import DBIngest
 from db_query import DBQuery
 from signal import signal, SIGTERM
-from concurrent.futures import ThreadPoolExecutor
 from rec2db import Rec2DB
 from runva import RunVA
-import os
-import time
-import uuid
+from language import text
+from threading import Event
+from configuration import env
+import traceback
 
-office = list(map(float, os.environ["OFFICE"].split(",")))
-dbhost = os.environ["DBHOST"]
-every_nth_frame = int(os.environ["EVERY_NTH_FRAME"])
+office = list(map(float, env["OFFICE"].split(",")))
+dbhost = env["DBHOST"]
+every_nth_frame = int(env["EVERY_NTH_FRAME"])
+mqtt_topic=env.get("MQTT_TOPIC","analytics")
 
-runva=None
-stop=False
+version = 2
+
+stop=Event()
 
 def connect(sensor, location, uri, algorithm, algorithmName):
     global runva
 
     try:
         rec2db=Rec2DB(sensor)
-        runva=RunVA("entrance_counting")
+        rec2db.start()
 
-        with ThreadPoolExecutor(2) as e:
-            e.submit(rec2db.loop)
+        runva=RunVA("entrance_counting", version, stop=stop)
+        runva.loop(sensor, location, uri, algorithm, algorithmName, topic=mqtt_topic)
 
-            # any VA exit indicates a camera disconnect
-            with ThreadPoolExecutor(1) as e1:
-                e1.submit(runva.loop, sensor, location, uri, algorithm, algorithmName)
+        rec2db.stop()
+        raise Exception("VA exited. This should not happen.")
 
-            if stop: rec2db.stop()
-            raise Exception("VA exited. This should not happen.")
-
-    except Exception as e:
-        print("Exception in connect: "+str(e), flush=True)
+    except:
+        print(traceback.format_exc(), flush=True)
 
 def quit_service(signum, sigframe):
-    global stop
-    stop=True
-    if runva: runva.stop()
+    stop.set()
 
 signal(SIGTERM, quit_service)
 dba=DBIngest(host=dbhost, index="algorithms", office=office)
 dbs=DBQuery(host=dbhost, index="sensors", office=office)
 
 # register algorithm (while waiting for db to startup)
-while not stop:
-    try:
-        algorithm=dba.ingest({
-            "name": "entrance-counting",
-            "office": {
-                "lat": office[0],
-                "lon": office[1],
-            },
-            "status": "processing",
-            "skip": every_nth_frame,
-        })["_id"]
-        break
-    except Exception as e:
-        print("Exception in count-entrance register algorithm: "+str(e), flush=True)
-        time.sleep(10)
+dba.wait(stop)
+algorithm=dba.ingest({
+    "name": text["entrance-counting"],
+    "office": {
+        "lat": office[0],
+        "lon": office[1],
+    },
+    "status": "processing",
+    "skip": every_nth_frame,
+})["_id"]
 
 # compete for a sensor connection
-while not stop:
+while not stop.is_set():
     try:
         print("Searching...", flush=True)
-        for sensor in dbs.search("sensor:'camera' and status:'idle' and algorithm='entrance-counting' and office:["+str(office[0])+","+str(office[1])+"]"):
+        for sensor in dbs.search("type:'camera' and status:'idle' and algorithm='entrance-counting' and office:["+str(office[0])+","+str(office[1])+"] and url:*"):
             try:
                 # compete (with other va instances) for a sensor
                 r=dbs.update(sensor["_id"],{"status":"streaming"},seq_no=sensor["_seq_no"],primary_term=sensor["_primary_term"])
+
+                if sensor["_source"]["url"].split(":")[0] == "rtmp": version=4
 
                 # stream from the sensor
                 print("Connected to "+sensor["_id"]+"...",flush=True)
@@ -78,7 +71,7 @@ while not stop:
 
                 # if exit, there is somehting wrong
                 r=dbs.update(sensor["_id"],{"status":"disconnected"})
-                if stop: break
+                if stop.is_set(): break
 
             except Exception as e:
                 print("Exception in count-entrance search sensor: "+str(e), flush=True)
@@ -86,7 +79,7 @@ while not stop:
     except Exception as e:
         print("Exception in count-entrance sensor connection: "+str(e), flush=True)
 
-    time.sleep(10)
+    stop.wait(10)
 
 # delete the algorithm instance
 dba.delete(algorithm)

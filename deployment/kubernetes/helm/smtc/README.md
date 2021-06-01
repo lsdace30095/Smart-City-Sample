@@ -78,3 +78,109 @@ Launch your browser and browse to `https://<hostname>` for the sample UI.
 * If you see a browser warning of self-signed certificate, please accept it to proceed to the sample UI.    
   
 ---
+
+### Multiple Office Start/Stop  
+
+The sample supposes dynamic office starting/stopping. It supports the IP cameras deployed in the gateway and pushed to office via gb28181. You can selectively start and stop any office, as follows:
+
+```
+cmake -DNOFFICES=2 ..
+make
+
+SCOPE=cloud make start_helm
+SCOPE=office1 make start_helm
+SCOPE=office2 make start_helm
+...
+SCOPE=office1 make stop_helm
+...
+SCOPE=office1 make start_helm
+...
+SCOPE=office1 make stop_helm
+SCOPE=office2 make stop_helm
+SCOPE=cloud make stop_helm
+```
+
+### Multiple Office Start/Stop with Camera Gateway  
+
+A camera gateway aggregates the camera streams and pushes the camera streams to the edge offices. This is requred if the link between the cameras and the edge offices is a 5G network. Camera gateway is for legacy IP cameras that do not support GB28181. IP cameras that support GB28181 can push streams to the edge office(s) without a camera gateway.   
+
+The sample supposes dynamic starting/stopping of each office service and camera gateway, as follows:   
+
+At the edge cloud/office cluster:   
+
+```
+cmake -DNOFFICES=2 ..
+make
+
+SCOPE=cloud make start_helm
+SCOPE=office1-svc make start_helm
+SCOPE=office2-svc make start_helm
+...
+SCOPE=office1-svc make stop_helm
+...
+SCOPE=office1-svc make start_helm
+...
+SCOPE=office1-svc make stop_helm
+SCOPE=office2-svc make stop_helm
+SCOPE=cloud make stop_helm
+```
+
+At the camera gateway:  
+
+```
+cmake -DNOFFICES=2 ..
+make
+
+SCOPE=office1-camera make start_helm
+SCOPE=office2-camera make start_helm
+...
+SCOPE=office1-camera make stop_helm
+SCOPE=office2-camera make stop_helm
+```
+
+### Multiple Cluster Setup
+
+The sample supports running Cloud and Edge in different Kubernetes clusters. The Cloud cluster hosts the web server, the cloud database, and the cloud storage. Multiple Edge clusters can be present, each of which hosts a local database, camera discovery, camera streaming, and analytics instances. The Edge and the Cloud communicate securely through a connector host.  
+
+```
+# Start Cloud instances
+cmake -DNOFFICES=2 ..
+make
+make tunnels
+
+SCOPE=cloud   CONNECTOR_CLOUD=<user>@<connect-host> make start_helm
+
+# Start Edge instances
+SCOPE=office1 CONNECTOR_CLOUD=<user>@<connect-host> make start_helm
+SCOPE=office2 CONNECTOR_CLOUD=<user>@<connect-host> make start_helm
+...
+SCOPE=office1 CONNECTOR_CLOUD=<user>@<connect-host> make stop_helm
+...
+SCOPE=office1 CONNECTOR_CLOUD=<user>@<connect-host> make start_helm
+...
+# Clean up
+SCOPE=office1 CONNECTOR_CLOUD=<user>@<connect-host> make stop_helm
+SCOPE=office2 CONNECTOR_CLOUD=<user>@<connect-host> make stop_helm
+SCOPE=cloud   CONNECTOR_CLOUD=<user>@<connect-host> make stop_helm
+```
+
+### Database High Availability
+
+Specify the following optional parameters for cloud or office database high-availability settings:
+
+```
+HA_CLOUD=3 make start_helm
+...
+HA_CLOUD=3 make stop_helm
+
+HA_CLOUD=3 HA_OFFICE=3 make start_helm
+...
+HA_CLOUD=3 HA_OFFICE=3 make stop_helm
+```
+
+---
+
+Each database instance requires about 2GB memory.   
+
+---
+

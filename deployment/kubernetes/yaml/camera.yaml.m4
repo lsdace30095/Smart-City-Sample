@@ -7,6 +7,8 @@ loop(OFFICEIDX,1,defn(`NOFFICES'),`
 include(office.m4)
 ifelse(len(defn(`OFFICE_LOCATION')),0,,`
 
+ifelse(defn(`DISCOVER_SIMULATED_CAMERA'),`true',`dnl
+
 ifelse(eval(defn(`NCAMERAS')>0),1,`dnl
 apiVersion: v1
 kind: Service
@@ -56,11 +58,19 @@ loop(`CAMERAIDX',1,defn(`NCAMERAS'),`dnl
 ifelse(defn(`SCENARIO_NAME'),`traffic',`dnl
             - name: FILES
               value: "_traffic.mp4$$"
+            - name: ALGORITHM
+              value: "object-detection"
 ')dnl
 ifelse(defn(`SCENARIO_NAME'),`stadium',`dnl
             - name: FILES
               value: "_svcq.mp4$$"
+            - name: ALGORITHM
+              value: "svcq-counting"
 ')dnl
+            - name: OFFICE
+              value: "defn(`OFFICE_LOCATION')"
+            - name: DBHOST
+              value: "http://ifelse(defn(`NOFFICES'),1,db,defn(`OFFICE_NAME')-db)-service:9200"
             - name: `NCAMERAS'
               value: "defn(`NCAMERAS')"
             - name: RTSP_PORT
@@ -69,15 +79,6 @@ ifelse(defn(`SCENARIO_NAME'),`stadium',`dnl
               value: "defn(`CAMERA_RTP_PORT')"
             - name: PORT_STEP
               value: "defn(`CAMERA_PORT_STEP')"
-          volumeMounts:
-            - mountPath: /etc/localtime
-              name: timezone
-              readOnly: true
-      volumes:
-          - name: timezone
-            hostPath:
-                path: /etc/localtime
-                type: File
 PLATFORM_NODE_SELECTOR(`Xeon')dnl
 ')dnl
 
@@ -130,7 +131,13 @@ loop(`CAMERAIDX',1,defn(`NCAMERAS2'),`dnl
 ')dnl
           env:
             - name: FILES
-              value: "crowd.mp4$$"
+              value: "_crowd.mp4$$"
+            - name: ALGORITHM
+              value: "crowd-counting"
+            - name: OFFICE
+              value: "defn(`OFFICE_LOCATION')"
+            - name: DBHOST
+              value: "http://ifelse(defn(`NOFFICES'),1,db,defn(`OFFICE_NAME')-db)-service:9200"
             - name: `NCAMERAS'
               value: "defn(`NCAMERAS2')"
             - name: RTSP_PORT
@@ -139,15 +146,6 @@ loop(`CAMERAIDX',1,defn(`NCAMERAS2'),`dnl
               value: "defn(`CAMERA_RTP_PORT')"
             - name: PORT_STEP
               value: "defn(`CAMERA_PORT_STEP')"
-          volumeMounts:
-            - mountPath: /etc/localtime
-              name: timezone
-              readOnly: true
-      volumes:
-          - name: timezone
-            hostPath:
-                path: /etc/localtime
-                type: File
 PLATFORM_NODE_SELECTOR(`Xeon')dnl
 ')dnl
 
@@ -200,6 +198,12 @@ loop(`CAMERAIDX',1,defn(`NCAMERAS3'),`dnl
           env:
             - name: FILES
               value: "_entrance.mp4$$"
+            - name: ALGORITHM
+              value: "entrance-counting"
+            - name: OFFICE
+              value: "defn(`OFFICE_LOCATION')"
+            - name: DBHOST
+              value: "http://ifelse(defn(`NOFFICES'),1,db,defn(`OFFICE_NAME')-db)-service:9200"
             - name: `NCAMERAS'
               value: "defn(`NCAMERAS3')"
             - name: RTSP_PORT
@@ -208,16 +212,8 @@ loop(`CAMERAIDX',1,defn(`NCAMERAS3'),`dnl
               value: "defn(`CAMERA_RTP_PORT')"
             - name: PORT_STEP
               value: "defn(`CAMERA_PORT_STEP')"
-          volumeMounts:
-            - mountPath: /etc/localtime
-              name: timezone
-              readOnly: true
-      volumes:
-          - name: timezone
-            hostPath:
-                path: /etc/localtime
-                type: File
 PLATFORM_NODE_SELECTOR(`Xeon')dnl
+')dnl
 ')dnl
 ')dnl
 

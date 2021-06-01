@@ -4,19 +4,20 @@ $("#office").on("open.zf.reveal", function(e) {
     var ctx2={};
 
     page.find("h3").empty().append(ctx.address+" @ ["+ctx.office.lat+","+ctx.office.lon+"]");
-    workload.create(ctx2,page.find('canvas'),ctx.address+" Workload");
+    workload.create(ctx2,page.find('canvas'),text.format("workload title",ctx.address));
     var update=function () {
         /* fill the algorithm table */
         apiHost.search("algorithms","name:*",ctx.office).then(function (data) {
             var tbody=page.find("[algorithm-table] tbody");
             tbody.empty();
             $.each(data.response,function (i,v) {
-                var sensor=("sensor" in v._source)?'<a href="javascript:void(0)">'+v._source.sensor+"</a>":"N/A";
-                var latency=("latency" in v._source)?v._source.latency.toFixed(2):"N/A";
-                var performance=("performance" in v._source)?v._source.performance.toFixed(2):"N/A";
-                var cpu=("cpu" in v._source)?v._source.cpu.toFixed(1):"N/A";
-                var mem=("memory" in v._source)?v._source.memory.toFixed(1):"N/A";
-                var line=$("<tr><td>"+v._source.name+"</td><td>"+v._id+"</td><td>"+sensor+"</td><td>"+v._source.status+"</td><td>"+latency+"</td><td>"+performance+"</td><td>"+v._source.skip+"</td><td>"+cpu+"</td><td>"+mem+"</td></tr>");
+                var sensor=("sensor" in v._source)?'<a href="javascript:void(0)">'+v._source.sensor+"</a>":text["N/A"];
+                var latency=("latency" in v._source)?v._source.latency.toFixed(2):text["N/A"];
+                var performance=("performance" in v._source)?v._source.performance.toFixed(2):text["N/A"];
+                var cpu=("cpu" in v._source)?v._source.cpu.toFixed(1):text["N/A"];
+                var mem=("memory" in v._source)?v._source.memory.toFixed(1):text["N/A"];
+                var skip=("skip" in v._source)?v._source.skip:text["N/A"];
+                var line=$("<tr><td>"+v._source.name+"</td><td>"+v._id+"</td><td>"+sensor+"</td><td>"+text.translate(v._source.status)+"</td><td>"+latency+"</td><td>"+performance+"</td><td>"+skip+"</td><td>"+cpu+"</td><td>"+mem+"</td></tr>");
                 tbody.append(line);
                 line.find("a").click(function () {
                     page.foundation("close");
@@ -31,7 +32,7 @@ $("#office").on("open.zf.reveal", function(e) {
             var tbody=page.find("[service-table] tbody");
             tbody.empty();
             $.each(data.response,function (i,v) {
-                var line=$("<tr><td>"+v._source.name+"</td><td>"+v._source.service+"</td><td>"+v._id+"</td><td>"+v._source.status+"</td></tr>");
+                var line=$("<tr><td>"+v._source.name+"</td><td>"+v._source.service+"</td><td>"+v._id+"</td><td>"+text.translate(v._source.status)+"</td></tr>");
                 tbody.append(line);
             });
         }).catch(function (e) {

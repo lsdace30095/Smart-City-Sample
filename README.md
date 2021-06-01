@@ -1,3 +1,5 @@
+
+
 The E2E sample implements aspects of smart city sensing, analytics and management features as follows:   
 
 <IMG src="doc/scope.png" height="250px">
@@ -15,7 +17,7 @@ The E2E sample implements aspects of smart city sensing, analytics and managemen
 
 The sample implements the Smart-City [`traffic`](https://github.com/OpenVisualCloud/Smart-City-Sample/wiki/Smart-City:-Traffic-Scenario) and [`stadium`](https://github.com/OpenVisualCloud/Smart-City-Sample/wiki/Smart-City:-Stadium-Scenario) scenarios. The [`traffic`](https://github.com/OpenVisualCloud/Smart-City-Sample/wiki/Smart-City:-Traffic-Scenario) scenario measures vehicle/pedestrian flow for planning purpose. The [`stadium`](https://github.com/OpenVisualCloud/Smart-City-Sample/wiki/Smart-City:-Stadium-Scenario) scenario focuses on different access control techniques, including entrance people counting, service-point queue counting, and stadium seating zone crowd counting.   
 
-| Traffic | Stadium |
+| [Traffic](https://www.youtube.com/watch?v=BWU0SEqEfbo") | Stadium |
 |:-------:|:-------:|
 |<IMG src="doc/traffic-ui.gif" width="100%"></IMG>|<IMG src="doc/stadium-ui.gif" width="100%"></IMG>|
 
@@ -36,10 +38,10 @@ The sample is powered by the following Open Visual Cloud software stacks:
 
 - **Time Zone**: Check that the timezone setting of your host machine is correctly configured. Timezone is used during build. If you plan to run the sample on a cluster of machines managed by Docker Swarm or Kubernetes, please make sure to synchronize time among the manager/master node and worker nodes.    
 
-- **Build Tools**: Install ```cmake``` and ```m4``` if they are not available on your system.        
+- **Build Tools**: Install `cmake`, `make`, `m4`, `wget` and `gawk` if they are not available on your system.        
 
 - **Docker Engine**:        
-  - Install [docker engine](https://docs.docker.com/install). Make sure you [setup](https://docs.docker.com/install/linux/linux-postinstall) docker to run as a regular user.   
+  - Install [docker engine](https://docs.docker.com/install). Minimum version required: `17.05`. Make sure you [setup](https://docs.docker.com/install/linux/linux-postinstall) docker to run as a regular user.        
   - Setup [docker swarm](https://docs.docker.com/engine/swarm), if you plan to deploy through docker swarm. See [Docker Swarm Setup](deployment/docker-swarm/README.md) for additional setup details.  
   - Setup [Kubernetes](https://kubernetes.io/docs/setup), if you plan to deploy through Kubernetes. See [Kubernetes Setup](deployment/kubernetes/README.md) for additional setup details.     
   - Setup docker proxy as follows if you are behind a firewall:   
@@ -100,5 +102,7 @@ Launch your browser and browse to ```https://<hostname>``` for the sample UI.
 - [Configuration Options](doc/cmake.md)          
 - [Docker Swarm Setup](deployment/docker-swarm/README.md)      
 - [Kubernetes Setup](deployment/kubernetes/README.md)
-- [Intel VCAC-A Setup](doc/vcac-a.md)
+- [Intel VCAC-A Setup](doc/vcac-a.md)  
+- [REST API List](doc/restapi.md)  
+- [Demo Video](https://www.youtube.com/watch?v=BWU0SEqEfbo)  
 

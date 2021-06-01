@@ -5,24 +5,22 @@ This document describes how to extend the sensors, offices and scenario maps for
 
 The sensors and offices data are defined in the following files:   
 
-- [sensor-info.m4](../maintenance/db-init/sensor-info.m4)
 - [sensor-info.json](../maintenance/db-init/sensor-info.json)
 - [scenario.js](../cloud/html/js/scenario.js)
 
-[sensor-info.m4](../maintenance/db-init/sensor-info.m4) is used in the deployment scripts. Only the office location information is included as follows:   
-
-```
-define(`traffic_office1_location',`45.539626,-122.929569')dnl
-define(`traffic_office2_location',`45.524460,-122.960475')dnl
-define(`traffic_office3_location',`45.543645,-122.984178')dnl
-```
-
 #### Extending Offices
 
-You can extend to use more offices by defining the office locations, for example:   
+You can extend to use more offices by defining the office locations in [sensor-info.json](../maintenance/db-init/sensor-info.json), for example:   
 
 ```
-define(`traffic_office4_location',`45.528462,-122.989766')dnl
+...
+    "scenario": "traffic",
+    "address": "Dawson Creek",    # Office friendly name
+    "location": {
+        "lat": 45.539626,         # Office location
+        "lon": -122.929569        # Office location
+    },
+...
 ```
 
 #### Extending Sensors (Simulated / IP Cameras)
@@ -68,7 +66,8 @@ The scenario map is currently limited to portion of Hillsboro, Oregon, USA. You 
 - Run the [osm-host.sh](../script/osm-host.sh) script, which will setup a local tile server on your machine ```http://localhost:8080```. The script takes the .osm.pbf file as the input argument. You can check if the map is properly rendered by looking at ```http://localhost:8080```.         
 - Run the [osm-totiles.sh](../script/osm-totiles.sh) script, which will extract the tiles from the local tile server. The script takes a rectangular region as input: ```<lon_min> <lon_max> <lat_min> <lat_max>```. This region will be your observable scenario map. The extracted tiles should be copied under [images/traffic](../cloud/html/images/traffic). You can delete any old tiles under [images/traffic](../cloud/html/images/traffic).   
 - Kill the local tile server: ```docker ps``` and ```docker kill```. We don't need it any more.   
-- Modify [scenario.js](../cloud/html/js/scenario.js) with the new display center location.   
+- Modify [scenario.js](../cloud/html/js/scenario.js) with the new display center location.  
+- Modify the office and camera coordinates in [sensor-info.json](../maintenance/db-init/sensor-info.json).  
 
 Rebuild the sample. You are good to go.  
 
@@ -79,7 +78,6 @@ The stadium scenario includes the following modes: entrance and service-point pe
 #### Extending Offices
 
 Modify the following files to update or extend office defintions:   
-- [sensor-info.m4](../maintenance/db-init/sensor-info.m4)
 - [sensor-info.json](../maintenance/db-init/sensor-info.json)
 - [zonemap-xxx.json](../cloud/html/images/stadium/zonemap-37.39856d-121.94866.json)
 
@@ -186,7 +184,6 @@ The script will generate the map tiles under [cloud/html/images/stadium](../clou
 
 The geo-wrapped image ```stadium_modified.tiff``` can be used to obtain location coordinates for offices, sensors, and seats. You can use [QGIS](https://www.qgis.org/en/site/index.html) or similar software to import the image and then examine the coordinates. The following files defines the office, sensor, and seats geo locations:   
 
-- [sensor-info.m4](../maintenance/db-init/sensor-info.m4)   
 - [sensor-info.json](../maintenance/db-init/sensor-info.json)   
 - [zonemap-xxx.json](../cloud/html/images/stadium/zonemap-37.39856d-121.94866.json)  
 - [scenario.js](../cloud/html/js/scenario.js)   

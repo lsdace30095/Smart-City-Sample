@@ -1,99 +1,218 @@
 #!/usr/bin/python3
 
+from signal import SIGTERM, signal
 from db_ingest import DBIngest
+from provision import Provision
+from configuration import env
+import traceback
 import requests
 import time
-import os
 import json
+import re
 
-dbhost=os.environ["DBHOST"]
-office=list(map(float,os.environ["OFFICE"].split(",")))
-proxyhost=os.environ["PROXYHOST"]
-scenario=os.environ["SCENARIO"]
-zone=os.environ["ZONE"]
+dbhost=env["DBHOST"]
+dbchost=env.get("DBCHOST",None)
+office=list(map(float,env["OFFICE"].split(",")))
+replicas=list(map(int,env["REPLICAS"].split(",")))
 
-_include_type_name={"include_type_name":"false"}
-officestr='$'+('$'.join(map(str,office)))
+def quit_service():
+    exit(143)
+
+signal(SIGTERM, quit_service)
+
+# wait until DB is ready
+dbs=DBIngest(index="sensors", office=office, host=dbhost)
+while True:
+    try:
+        if dbs.health(): break
+    except:
+        print("Waiting for DB...", flush=True)
+    time.sleep(1)
+    
+officestr=dbs.office()
 settings={
     "offices": {
         "settings": {
-            "index.routing.allocation.include.zone": "cloud",
             "index": {
                 "number_of_shards": 1,
-                "number_of_replicas": 0,
+                "number_of_replicas": replicas[0],
             },
         },
         "mappings": {
             "properties": {
                 "location": { "type": "geo_point", },
-            },
-        },
-    },
-    "recordings_c": {
-        "settings": {
-            "index.routing.allocation.include.zone": "cloud",
-            "index": {
-                "number_of_shards": 1,
-                "number_of_replicas": 0,
-            },
-        },
-        "mappings": {
-            "properties": {
-                "office": { "type": "geo_point", },
             },
         },
     },
     "provisions"+officestr: {
         "settings": {
-            "index.routing.allocation.include.zone": "cloud,"+zone,
             "index": {
                 "number_of_shards": 1,
-                "number_of_replicas": 1,
+                "number_of_replicas": replicas[1],
             },
         },
         "mappings": {
             "properties": {
                 "location": { "type": "geo_point", },
+                "office": { "type": "geo_point", },
+                "ip": { "type": "ip_range", },
+                "rtmpid": {
+                    "type" : "text",
+                    "fields" : {
+                        "keyword" : {
+                            "type" : "keyword",
+                            "ignore_above" : 256,
+                        },
+                    },
+                },
             },
         },
     },
     "sensors"+officestr: {
         "settings": {
-            "index.routing.allocation.include.zone": "cloud,"+zone,
             "index": {
                 "number_of_shards": 1,
-                "number_of_replicas": 1,
+                "number_of_replicas": replicas[1],
             },
         },
         "mappings": {
             "properties": {
                 "office": { "type": "geo_point", },
                 "location": { "type": "geo_point", },
+                "ip": { "type": "ip_range", },
+                "type": {
+                    "type" : "text",
+                    "fields" : {
+                        "keyword" : {
+                            "type" : "keyword",
+                            "ignore_above" : 256,
+                        },
+                    },
+                },
+                "subtype": {
+                    "type" : "text",
+                    "fields" : {
+                        "keyword" : {
+                            "type" : "keyword",
+                            "ignore_above" : 256,
+                        },
+                    },
+                },
+                "algorithm": {
+                    "type" : "text",
+                    "fields" : {
+                        "keyword" : {
+                            "type" : "keyword",
+                            "ignore_above" : 256,
+                        },
+                    },
+                },
+                "address": {
+                    "type" : "text",
+                    "fields" : {
+                        "keyword" : {
+                            "type" : "keyword",
+                            "ignore_above" : 256,
+                        },
+                    },
+                },
+                "mnth": { "type": "float" },
+                "alpha": { "type": "float" },
+                "fovh": { "type": "float" },
+                "fovv": { "type": "float" },
+                "theta": { "type": "float" },
+            },
+        },
+    },
+    "sensors": {
+        "settings": {
+            "index": {
+                "number_of_shards": 1,
+                "number_of_replicas": replicas[0],
+            },
+        },
+        "mappings": {
+            "properties": {
+                "office": { "type": "geo_point", },
+                "location": { "type": "geo_point", },
+                "ip": { "type": "ip_range", },
+                "type": {
+                    "type" : "text",
+                    "fields" : {
+                        "keyword" : {
+                            "type" : "keyword",
+                            "ignore_above" : 256,
+                        },
+                    },
+                },
+                "subtype": {
+                    "type" : "text",
+                    "fields" : {
+                        "keyword" : {
+                            "type" : "keyword",
+                            "ignore_above" : 256,
+                        },
+                    },
+                },
+                "algorithm": {
+                    "type" : "text",
+                    "fields" : {
+                        "keyword" : {
+                            "type" : "keyword",
+                            "ignore_above" : 256,
+                        },
+                    },
+                },
+                "address": {
+                    "type" : "text",
+                    "fields" : {
+                        "keyword" : {
+                            "type" : "keyword",
+                            "ignore_above" : 256,
+                        },
+                    },
+                },
+                "mnth": { "type": "float" },
+                "alpha": { "type": "float" },
+                "fovh": { "type": "float" },
+                "fovv": { "type": "float" },
+                "theta": { "type": "float" },
             },
         },
     },
     "recordings"+officestr: {
         "settings": {
-            "index.routing.allocation.include.zone": "cloud,"+zone,
             "index": {
                 "number_of_shards": 1,
-                "number_of_replicas": 1,
+                "number_of_replicas": replicas[1],
             },
         },
         "mappings": {
             "properties": {
                 "office": { "type": "geo_point" },
                 "time": { "type": "date" },
-                "streams": { "type": "nested" },
+            },
+        },
+    },
+    "recordings": {
+        "settings": {
+            "index": {
+                "number_of_shards": 1,
+                "number_of_replicas": replicas[0],
+            },
+        },
+        "mappings": {
+            "properties": {
+                "office": { "type": "geo_point" },
+                "time": { "type": "date" },
             },
         },
     },
     "algorithms"+officestr: {
         "settings": {
-            "index.routing.allocation.include.zone": "cloud,"+zone,
             "index": {
                 "number_of_shards": 1,
-                "number_of_replicas": 1,
+                "number_of_replicas": replicas[1],
             },
         },
         "mappings": {
@@ -104,10 +223,25 @@ settings={
     },
     "analytics"+officestr: {
         "settings": {
-            "index.routing.allocation.include.zone": "cloud,"+zone,
             "index": {
                 "number_of_shards": 1,
-                "number_of_replicas": 1,
+                "number_of_replicas": replicas[1],
+            },
+        },
+        "mappings": {
+            "properties": {
+                "office": { "type": "geo_point" },
+                "location": { "type": "geo_point" },
+                "time": { "type": "date" },
+                "objects": { "type": "nested" },
+            },
+        },
+    },
+    "analytics": {
+        "settings": {
+            "index": {
+                "number_of_shards": 1,
+                "number_of_replicas": replicas[0],
             },
         },
         "mappings": {
@@ -121,10 +255,9 @@ settings={
     },
     "alerts"+officestr: {
         "settings": {
-            "index.routing.allocation.include.zone": "cloud,"+zone,
             "index": {
                 "number_of_shards": 1,
-                "number_of_replicas": 1,
+                "number_of_replicas": replicas[1],
             },
         },
         "mappings": {
@@ -137,10 +270,9 @@ settings={
     },
     "services"+officestr: {
         "settings": {
-            "index.routing.allocation.include.zone": "cloud,"+zone,
             "index": {
                 "number_of_shards": 1,
-                "number_of_replicas": 1,
+                "number_of_replicas": replicas[1],
             },
         },
         "mappings": {
@@ -151,37 +283,43 @@ settings={
     },
 }
 
-# initialize db index settings
-routing_key="index.routing.allocation.include.zone"
-for index in settings:
-    routing_value=settings[index]["settings"].pop(routing_key)
-    while True:
-        try:
-            r=requests.put(dbhost+"/"+index,json=settings[index],params=_include_type_name)
-            r=requests.put(dbhost+"/"+index+"/_settings",json={ routing_key: routing_value })
-            break
-        except Exception as e:
-            print("Exception: "+str(e),flush=True)
-            time.sleep(2)
+_requests=requests.Session()
+while True:
+    try:
+        # delete office specific indexes (to start the office afresh)
+        for index in settings:
+            if index.endswith(officestr):
+                print("Delete index "+index , flush=True)
+                r=_requests.delete(dbhost+"/"+index)
 
-# populate db with simulated offices and provisions
-with open("/run/secrets/sensor-info.json","rt") as fd:
-    data=json.load(fd)
-    dbo=DBIngest(index="offices",office="",host=dbhost)
-    dbp=DBIngest(index="provisions", office=office, host=dbhost)
-    for office1 in data:
-        if scenario != office1["scenario"]: continue
-        location1=office1["location"]
-        if location1["lat"]!=office[0] or location1["lon"]!=office[1]: continue
-        office1.pop("scenario")
+        # initialize db index settings
+        _include_type_name={"include_type_name":"false"}
+        for index in settings:
+            print("Initialize index "+index, flush=True)
+            host=dbhost if index.endswith(officestr) else dbchost
+            if host:
+                r=_requests.put(host+"/"+index,json=settings[index],params=_include_type_name)
+                print(r.json(), flush=True)
 
-        sensors=office1.pop("sensors")
-        office1["uri"]=proxyhost
-        office1["zone"]=zone
-        dbo.ingest(office1,officestr[1:])
+        officeinfo=Provision(officestr)
 
-        for s in sensors: s["office"]=location1
-        dbp.ingest_bulk(sensors)
+        if dbchost:
+            print("Register office {}".format(office), flush=True)
+            dbo_c=DBIngest(index="offices",office="",host=dbchost)
+            dbo_c.ingest(officeinfo, id1=officestr)
+
+        print("Signal starting up", flush=True)
+        dbs.ingest({"type":"startup"})
+        break
+
+    except Exception as e:
+        print(traceback.format_exc(), flush=True)
+        print("Waiting for DB...", flush=True)
+
+    time.sleep(1)
 
 print("DB Initialized", flush=True)
+
+while True:
+    time.sleep(10000)
 

@@ -5,12 +5,19 @@
 {{- range $scenarioIdx, $scenarioName := $.Values.scenario }}
 {{- $args := dict "scenarioName" $scenarioName "Values" $.Values }}
 {{- range $officeIdx := until ( int ( include "smtc.noffices" $args ) ) }}
-{{- $officeName := printf "%s-office%d" $scenarioName $officeIdx }}
+{{- $officeName := printf "%s-office%d" $scenarioName (add $officeIdx 1) }}
+
+{{- $scope1 := printf "office%d-camera" (add $officeIdx 1) }}
+{{- if contains $.Values.buildScope $scope1 }}
 
 {{- $args := dict "scenarioName" $scenarioName "Values" $.Values }}
 {{- $ncameras := int ( include "smtc.ncameras" $args ) }}
+{{- $args := dict "Values" $.Values }}
+{{- $cameraGateway := include "smtc.cameraGateway" $args }}
 
 {{- if gt $ncameras 0 }}
+
+{{- if (int $.Values.discoverSimulatedCamera) }}
 
 apiVersion: v1
 kind: Service
@@ -60,10 +67,24 @@ spec:
             {{- if eq $scenarioName "traffic" }}
             - name: FILES
               value: "_traffic.mp4$$"
+            - name: ALGORITHM
+              value: "object-detection"
             {{- else if eq $scenarioName "stadium" }}
             - name: FILES
               value: "_svcq.mp4$$"
+            - name: ALGORITHM
+              value: "svcq-counting"
             {{- end }}
+            - name: OFFICE
+              {{- $args := dict "scenarioName" $scenarioName "Values" $.Values "officeIdx" $officeIdx }}
+              value: {{ include "smtc.env.office" $args | quote }}
+            - name: DBHOST
+{{- if eq $cameraGateway "enable" }}
+              value: "http://{{ $officeName }}-camera-gateway-db-service:9200"
+{{- else }}
+              {{- $args := dict "officeName" $officeName "Values" $.Values }}
+              value: {{ include "smtc.env.dbhost" $args | quote }}
+{{- end }}
             - name: NCAMERAS
               value: {{ $ncameras | quote}}
             - name: RTSP_PORT
@@ -72,15 +93,6 @@ spec:
               value: {{ $.Values.cameraRTPPort | quote }}
             - name: PORT_STEP
               value: {{ $.Values.cameraPortStep | quote }}
-          volumeMounts:
-            - mountPath: /etc/localtime
-              name: timezone
-              readOnly: true
-      volumes:
-          - name: timezone
-            hostPath:
-                path: /etc/localtime
-                type: File
       {{ include "smtc.platform.node-selector" $ }}
 
 {{- end }}
@@ -134,7 +146,19 @@ spec:
             {{- end }}
           env:
             - name: FILES
-              value: "crowd.mp4$$"
+              value: "_crowd.mp4$$"
+            - name: ALGORITHM
+              value: "crowd-counting"
+            - name: OFFICE
+              {{- $args := dict "scenarioName" $scenarioName "Values" $.Values "officeIdx" $officeIdx }}
+              value: {{ include "smtc.env.office" $args | quote }}
+            - name: DBHOST
+{{- if eq $cameraGateway "enable" }}
+              value: "http://{{ $officeName }}-camera-gateway-db-service:9200"
+{{- else }}
+              {{- $args := dict "officeName" $officeName "Values" $.Values }}
+              value: {{ include "smtc.env.dbhost" $args | quote }}
+{{- end }}
             - name: NCAMERAS
               value: {{ $.Values.ncameras.crowd | quote }}
             - name: RTSP_PORT
@@ -143,15 +167,6 @@ spec:
               value: {{ $.Values.cameraRTPPort | quote }}
             - name: PORT_STEP
               value: {{ $.Values.cameraPortStep | quote }}
-          volumeMounts:
-            - mountPath: /etc/localtime
-              name: timezone
-              readOnly: true
-      volumes:
-          - name: timezone
-            hostPath:
-                path: /etc/localtime
-                type: File
       {{ include "smtc.platform.node-selector" $ }}
 
 {{- end }}
@@ -205,6 +220,18 @@ spec:
           env:
             - name: FILES
               value: "_entrance.mp4$$"
+            - name: ALGORITHM
+              value: "entrance-counting"
+            - name: OFFICE
+              {{- $args := dict "scenarioName" $scenarioName "Values" $.Values "officeIdx" $officeIdx }}
+              value: {{ include "smtc.env.office" $args | quote }}
+            - name: DBHOST
+{{- if eq $cameraGateway "enable" }}
+              value: "http://{{ $officeName }}-camera-gateway-db-service:9200"
+{{- else }}
+              {{- $args := dict "officeName" $officeName "Values" $.Values }}
+              value: {{ include "smtc.env.dbhost" $args | quote }}
+{{- end }}
             - name: NCAMERAS
               value: {{ $.Values.ncameras.entrance | quote }}
             - name: RTSP_PORT
@@ -213,21 +240,14 @@ spec:
               value: {{ $.Values.cameraRTPPort | quote }}
             - name: PORT_STEP
               value: {{ $.Values.cameraPortStep | quote }}
-          volumeMounts:
-            - mountPath: /etc/localtime
-              name: timezone
-              readOnly: true
-      volumes:
-          - name: timezone
-            hostPath:
-                path: /etc/localtime
-                type: File
       {{ include "smtc.platform.node-selector" $ }}
 
+{{- end }}
 {{- end }}
 {{- end }}
 
 ---
 
+{{- end }}
 {{- end }}
 {{- end }}

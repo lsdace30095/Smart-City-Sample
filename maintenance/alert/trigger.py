@@ -1,12 +1,11 @@
 #!/usr/bin/python3
 
 from db_ingest import DBIngest
-import datetime
+from configuration import env
 import time
-import os
 
-office=list(map(float, os.environ["OFFICE"].split(",")))
-dbhost=os.environ["DBHOST"]
+office=list(map(float, env["OFFICE"].split(",")))
+dbhost=env["DBHOST"]
 
 class Trigger(object):
     def __init__(self):
@@ -16,14 +15,14 @@ class Trigger(object):
     def trigger(self):
         return None
 
-    def loop(self):
-        while True:
-            info=self.trigger()
+    def loop(self, stop):
+        while not stop.is_set():
+            info=self.trigger(stop)
             if not info: continue
 
             for v in info:
                 v.update({
-                    "time": int(time.mktime(datetime.datetime.now().timetuple())*1000),
+                    "time": int(time.time()*1000),
                     "office": {
                         "lat": office[0],
                         "lon": office[1],

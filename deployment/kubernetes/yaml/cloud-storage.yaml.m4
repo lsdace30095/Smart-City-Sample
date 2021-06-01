@@ -1,5 +1,7 @@
 include(platform.m4)
 
+ifelse(index(`cloud',defn(`BUILD_SCOPE')),-1,,`
+
 apiVersion: v1
 kind: Service
 metadata:
@@ -40,21 +42,21 @@ spec:
             - containerPort: 8080
           env:
             - name: DBHOST
-              value: "http://ifelse(eval(defn(`NOFFICES')>1),1,cloud-db,db)-service:9200"
-            - name: PROXYHOST
-              value: "http://cloud-storage-service.default.svc.cluster.local:8080"
+              value: "http://ifelse(defn(`NOFFICES'),1,db,cloud-db)-service:9200"
             - name: INDEXES
-              value: "recordings_c"
+              value: "recordings"
             - name: RETENTION_TIME
-              value: "1800"
+              value: "7200"
             - name: SERVICE_INTERVAL
-              value: "1800"
+              value: "3600"
             - name: WARN_DISK
-              value: "75"
+              value: "70"
             - name: FATAL_DISK
-              value: "85"
+              value: "75"
             - name: HALT_REC
-              value: "95"
+              value: "80"
+            - name: THUMBNAIL_CACHE
+              value: "50"
             - name: NO_PROXY
               value: "*"
             - name: no_proxy
@@ -69,3 +71,5 @@ spec:
             path: /etc/localtime
             type: File
 PLATFORM_NODE_SELECTOR(`Xeon')dnl
+
+')

@@ -4,9 +4,6 @@ The sample is designed around database ingest and search:
   - On the home page, the users can search cameras properties, for example, the office location (the computing facilities where the cameras are connected to.)    
   - On the office page, the users can search analytics algorithms and see their execution statuses.    
   - On the recording page, the users can search recorded clips and review them.    
-- Internally, a set of services each retrieves the work order by querying the database and submits the processing results back into the database.   
-
-<IMG src="data-centric-design.png">
 
 ### Search Language  
 
@@ -48,15 +45,15 @@ Substring Match: ```sensor:"camera"``` or ```sensor:'camera'```
 Return records based on the geo-location of a search field.    
 Examples: ```office:[45,-122]``` or ```office:[45,-122,100]```   
 
+- IP Address Search:
+
+Return records based on the IP address of a search field.   
+Examples: `ip=192.168.0.1` or `ip=192.168.0.0/16`   
+
 - Complex Search:   
 
 Return records for any logic combinations of simple searches.    
 Example: ```duration>20 and time>10:10:10```    
-
-- Where Search (available on the recording page):   
-
-Return recordings whose analytics data meet certain criteria.      
-Example: ```time>now-10000 where objects.detection.bounding_box.x_max-objects.detection.bounding_box.x_min>0.1```    
 
 ### See Also:
 

@@ -2,17 +2,19 @@
 
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+from configuration import env
 import requests
 import os
 
-office=list(map(float,os.environ["OFFICE"].split(",")))
-sthost=os.environ["STHOST"]
+office=list(map(float,env["OFFICE"].split(",")))
+sthost=env["STHOST"]
 
 class Handler(FileSystemEventHandler):
     def __init__(self, sensor):
         super(Handler,self).__init__()
         self._sensor = sensor
         self._last_file = None
+        self._requests=requests.Session()
     
     def on_created(self, event):
         print("on_created: "+event.src_path, flush=True)
@@ -28,7 +30,7 @@ class Handler(FileSystemEventHandler):
 
     def _process_file(self, filename):
         with open(filename,"rb") as fd:
-            r=requests.post(sthost,data={
+            r=self._requests.post(sthost,data={
                 "time":str(int(int(os.path.basename(filename).split('_')[-2])/1000000)),
                 "office":str(office[0])+","+str(office[1]),
                 "sensor":self._sensor,
@@ -41,18 +43,16 @@ class Rec2DB(object):
     def __init__(self, sensor):
         super(Rec2DB,self).__init__()
         self._sensor=sensor
-        self._handler=Handler(sensor)
         self._observer=Observer()
-        self._watcher=None
 
-    def loop(self):
-        self._observer.start()
-
+    def start(self):
         folder="/tmp/rec/"+self._sensor
         os.makedirs(folder, exist_ok=True)
-        self._watcher=self._observer.schedule(self._handler, folder, recursive=True)
-        self._observer.join()
+
+        handler=Handler(self._sensor)
+        self._observer.schedule(handler, folder, recursive=True)
+        self._observer.start()
 
     def stop(self):
-        if self._watcher: self._observer.unschedule(self._watcher)
         self._observer.stop()
+        self._observer.join()

@@ -37,17 +37,21 @@ ifelse(defn(`DISCOVER_IP_CAMERA'),`true',`dnl
             - name: OFFICE
               value: "defn(`OFFICE_LOCATION')"
             - name: DBHOST
-              value: "http://ifelse(eval(defn(`NOFFICES')>1),1,defn(`OFFICE_NAME')-db,db)-service:9200"
+              value: "http://ifelse(defn(`NOFFICES'),1,db,defn(`OFFICE_NAME')-db)-service:9200"
             - name: MQTTHOST
               value: "defn(`OFFICE_NAME')-mqtt-service"
             - name: STHOST
               value: "http://defn(`OFFICE_NAME')-storage-service:8080/api/upload"
+            - name: MQTT_TOPIC
+              value: "ifelse(defn(`OT_TYPE'),`false',analytics,relayanalytics)"
             - name: EVERY_NTH_FRAME
               value: "6"
             - name: `SCENARIO'
               value: "defn(`SCENARIO_NAME')"
             - name: `NETWORK_PREFERENCE'
               value: "{\"defn(`PLATFORM_DEVICE')\":\"defn(`NETWORK_PREFERENCE')\"}"
+            - name: GST_DEBUG
+              value: "3"
             - name: NO_PROXY
               value: "*"
             - name: no_proxy
@@ -61,6 +65,7 @@ ifelse(defn(`DISCOVER_IP_CAMERA'),`true',`dnl
 defn(`PLATFORM_VOLUME_MOUNTS')dnl
       initContainers:
             - image: busybox:latest
+              imagePullPolicy: IfNotPresent
               name: init
               command: ["/bin/chown","defn(`USERID'):defn(`GROUPID')","/tmp/rec"]
               volumeMounts:
@@ -109,11 +114,13 @@ ifelse(defn(`DISCOVER_IP_CAMERA'),`true',`dnl
             - name: OFFICE
               value: "defn(`OFFICE_LOCATION')"
             - name: DBHOST
-              value: "http://ifelse(eval(defn(`NOFFICES')>1),1,defn(`OFFICE_NAME')-db,db)-service:9200"
+              value: "http://ifelse(defn(`NOFFICES'),1,db,defn(`OFFICE_NAME')-db)-service:9200"
             - name: MQTTHOST
               value: "defn(`OFFICE_NAME')-mqtt-service"
             - name: STHOST
               value: "http://defn(`OFFICE_NAME')-storage-service:8080/api/upload"
+            - name: MQTT_TOPIC
+              value: "ifelse(defn(`OT_TYPE'),`false',analytics,relayanalytics)"
             - name: EVERY_NTH_FRAME
               value: "6"
             - name: `SCENARIO'
@@ -133,6 +140,7 @@ ifelse(defn(`DISCOVER_IP_CAMERA'),`true',`dnl
 defn(`PLATFORM_VOLUME_MOUNTS')dnl
       initContainers:
             - image: busybox:latest
+              imagePullPolicy: IfNotPresent
               name: init
               command: ["/bin/chown","defn(`USERID'):defn(`GROUPID')","/tmp/rec"]
               volumeMounts:
@@ -181,11 +189,13 @@ ifelse(defn(`DISCOVER_IP_CAMERA'),`true',`dnl
             - name: OFFICE
               value: "defn(`OFFICE_LOCATION')"
             - name: DBHOST
-              value: "http://ifelse(eval(defn(`NOFFICES')>1),1,defn(`OFFICE_NAME')-db,db)-service:9200"
+              value: "http://ifelse(defn(`NOFFICES'),1,db,defn(`OFFICE_NAME')-db)-service:9200"
             - name: MQTTHOST
               value: "defn(`OFFICE_NAME')-mqtt-service"
             - name: STHOST
               value: "http://defn(`OFFICE_NAME')-storage-service:8080/api/upload"
+            - name: MQTT_TOPIC
+              value: "analytics"
             - name: EVERY_NTH_FRAME
               value: "6"
             - name: `SCENARIO'
@@ -205,6 +215,7 @@ ifelse(defn(`DISCOVER_IP_CAMERA'),`true',`dnl
 defn(`PLATFORM_VOLUME_MOUNTS')dnl
       initContainers:
             - image: busybox:latest
+              imagePullPolicy: IfNotPresent
               name: init
               command: ["/bin/chown","defn(`USERID'):defn(`GROUPID')","/tmp/rec"]
               volumeMounts:
@@ -253,11 +264,13 @@ ifelse(defn(`DISCOVER_IP_CAMERA'),`true',`dnl
             - name: OFFICE
               value: "defn(`OFFICE_LOCATION')"
             - name: DBHOST
-              value: "http://ifelse(eval(defn(`NOFFICES')>1),1,defn(`OFFICE_NAME')-db,db)-service:9200"
+              value: "http://ifelse(defn(`NOFFICES'),1,db,defn(`OFFICE_NAME')-db)-service:9200"
             - name: MQTTHOST
               value: "defn(`OFFICE_NAME')-mqtt-service"
             - name: STHOST
               value: "http://defn(`OFFICE_NAME')-storage-service:8080/api/upload"
+            - name: MQTT_TOPIC
+              value: "ifelse(defn(`OT_TYPE'),`false',analytics,relayanalytics)"
             - name: EVERY_NTH_FRAME
               value: "6"
             - name: `SCENARIO'
@@ -277,6 +290,7 @@ ifelse(defn(`DISCOVER_IP_CAMERA'),`true',`dnl
 defn(`PLATFORM_VOLUME_MOUNTS')dnl
       initContainers:
             - image: busybox:latest
+              imagePullPolicy: IfNotPresent
               name: init
               command: ["/bin/chown","defn(`USERID'):defn(`GROUPID')","/tmp/rec"]
               volumeMounts:

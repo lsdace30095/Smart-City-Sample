@@ -1,4 +1,6 @@
 
+{{- if contains $.Values.buildScope "cloud" }}
+
 apiVersion: v1
 kind: Service
 metadata:
@@ -6,24 +8,24 @@ metadata:
   labels:
     app: {{ include "smtc.db.name" . }}
 spec:
+  clusterIP: None
   ports:
   - port: 9200
     protocol: TCP
-    name: dsl
-  - port: 9300
-    protocol: TCP
-    name: transport
   selector:
     app: {{ include "smtc.db.name" . }}
+
 ---
+
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: {{ include "smtc.db.name" . }}
   labels:
      app: {{ include "smtc.db.name" . }}
 spec:
-  replicas: 1
+  serviceName: {{ include "smtc.db.name" . }}
+  replicas: {{ int $.Values.database.haCloud }}
   selector:
     matchLabels:
       app: {{ include "smtc.db.name" . }}
@@ -31,29 +33,34 @@ spec:
     metadata:
       labels:
         app: {{ include "smtc.db.name" . }}
+        database: "yes"
     spec:
       enableServiceLinks: false
+      securityContext:
+        fsGroup: 1000
       containers:
         - name: {{ include "smtc.db.name" . }}
-          image: docker.elastic.co/elasticsearch/elasticsearch-oss:6.8.1
+          image: docker.elastic.co/elasticsearch/elasticsearch-oss:6.8.13
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 9200
             - containerPort: 9300
           env:
-            {{- if gt (int .Values.noffices) 1 }}
+            {{- if or (gt (int .Values.noffices) 1) (gt (int .Values.database.haCloud) 1) }}
             - name: "cluster.name"
-              value: "db-cluster"
+              value: "cloud-cluster"
             - name: "node.name"
               value: "cloud-db"
             - name: "node.master"
               value: "true"
             - name: "node.data"
               value: "true"
-            - name: "node.attr.zone"
-              value: "cloud"
             - name: "ES_JAVA_OPTS"
               value: "-Xms2048m -Xmx2048m"
+            - name: "discovery.zen.minimum_master_nodes"
+              value: "{{ if eq (mod (int $.Values.database.haCloud) 2) 0 }}{{ sub (int $.Values.database.haCloud) 1 }}{{ else }}{{ int $.Values.database.haCloud }}{{ end }}"
+            - name: "discovery.zen.ping.unicast.hosts"
+              value: "{{ include "smtc.db.name" . }}-service"
             {{- else }}
             - name: "discovery.type"
               value: "single-node"
@@ -68,10 +75,18 @@ spec:
             - mountPath: /etc/localtime
               name: timezone
               readOnly: true
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/usr/bin/curl","-X","DELETE","http://localhost:9200/offices,sensors_*"]
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
       initContainers:
         - name: init-volume-sysctl
           image: busybox:latest
-          command: ["sh","-c","sysctl -w vm.max_map_count=262144"]
+          imagePullPolicy: IfNotPresent
+          command: ["sh","-c","sysctl -w vm.max_map_count=262144 && ulimit -n 65535 && ulimit -u 4096"]
           securityContext:
             privileged: true
       volumes:
@@ -80,3 +95,16 @@ spec:
                 path: /etc/localtime
                 type: File
       {{ include "smtc.platform.node-selector" . }}
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: database
+                  operator: In
+                  values:
+                  - "yes"
+              topologyKey: "kubernetes.io/hostname"
+
+{{- end }}

@@ -1,5 +1,7 @@
 include(platform.m4)
 
+ifelse(index(`cloud',defn(`BUILD_SCOPE')),-1,,`
+
 apiVersion: v1
 kind: Service
 metadata:
@@ -43,11 +45,11 @@ spec:
             - containerPort: 8443
           env:
             - name: DBHOST
-              value: "http://ifelse(eval(defn(`NOFFICES')>1),1,cloud-db,db)-service:9200"
+              value: "http://ifelse(defn(`NOFFICES'),1,db,cloud-db)-service:9200"
             - name: `SCENARIO'
               value: "defn(`SCENARIO')"
-            - name: HEALTH_CHECK
-              value: "ifelse(eval(defn(`NOFFICES')>1),1,enabled,disabled)"
+            - name: GWHOST
+              value: "http://cloud-gateway-service:8080"
             - name: NO_PROXY
               value: "*"
             - name: no_proxy
@@ -68,3 +70,5 @@ spec:
           secret:
             secretName: self-signed-certificate
 PLATFORM_NODE_SELECTOR(`Xeon')dnl
+
+')

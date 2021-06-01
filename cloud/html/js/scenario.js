@@ -14,10 +14,10 @@ function update_control_options(page, map, options) {
 }
 
 function format_bandwidth(bandwidth) {
-    var unit="b/s";
-    if (bandwidth>1024) { bandwidth=bandwidth/1024; unit="Kb/s"; }
-    if (bandwidth>1024) { bandwidth=bandwidth/1024; unit="Mb/s"; }
-    if (bandwidth>1024) { bandwidth=bandwidth/1024; unit="Gb/s"; }
+    var unit=text["b/s"];
+    if (bandwidth>1024) { bandwidth=bandwidth/1024; unit=text["kb/s"]; }
+    if (bandwidth>1024) { bandwidth=bandwidth/1024; unit=text["mb/s"]; }
+    if (bandwidth>1024) { bandwidth=bandwidth/1024; unit=text["gb/s"]; }
     return bandwidth>0?bandwidth.toFixed(1)+unit:"";
 }
 
@@ -55,8 +55,25 @@ var scenarios={
                     iconAnchor: [16,16],
                 }),
             },
+            mobile_camera: {
+                idle: L.icon({
+                    iconUrl: "images/camera-idle.gif",
+                    iconSize: [32,32],
+                    iconAnchor: [16,16],
+                }),
+                streaming: L.icon({
+                    iconUrl: "images/camera-streaming.gif",
+                    iconSize: [32,32],
+                    iconAnchor: [16,16],
+                }),
+                disconnected: L.icon({
+                    iconUrl: "images/camera-disconnected.gif",
+                    iconSize: [32,32],
+                    iconAnchor: [16,16],
+                }),
+            },
             sensor_icon: function (sensor, online) {
-                return scenarios.traffic.icon[sensor._source.model][online?sensor._source.status:"disconnected"];
+                return scenarios.traffic.icon[sensor._source.subtype][online?sensor._source.status:"disconnected"];
             },
             sensor_icon_rotation: function (sensor) {
                 return 90-sensor._source.theta;
@@ -80,7 +97,7 @@ var scenarios={
                 map.setView(scenarios.traffic.center,page.data('zoom'));
             });
             if (order==0) layer1.addTo(map).fire('add');
-            page.data('controls').addBaseLayer(layer1,"Traffic Planning");
+            page.data('controls').addBaseLayer(layer1,text["traffic planning"]);
         },
         create_sensor: function (officectx, sensorctx, sensor, page, map) {
             stats.create(sensorctx, sensor, page, map, function (chart_div) { return null; });
@@ -89,17 +106,26 @@ var scenarios={
             sensorctx.update_sensor=function (sensor) {
                 var stat_layer=page.data('stat').layer;
                 if (map.hasLayer(stat_layer)) {
-                    apiHost.histogram("analytics",'sensor="'+sensor._id+'" and '+settings.stats_query(),settings.stats_histogram(),25,sensor._source.office).then(function (data) {
-                        stats.update(stat_layer, sensorctx, map.getZoom(), sensor, data, null);
-                    }).catch(function () {
+                    if (sensor._source.status=="streaming") {
+                        apiHost.histogram("analytics",'sensor="'+sensor._id+'" and '+settings.stats_query(),settings.stats_histogram(),25,sensor._source.office).then(function (data) {
+                            stats.update(stat_layer, sensorctx, map.getZoom(), sensor, data, null);
+                        }).catch(function () {
+                            stats.update(stat_layer, sensorctx, map.getZoom(), sensor, {}, null);
+                        });
+                    } else {
                         stats.update(stat_layer, sensorctx, map.getZoom(), sensor, {}, null);
-                    });
+                    }
                 }
 
                 /* show heatmap */
                 var heatmap_layer=page.data('heatmap').layer;
-                if (map.hasLayer(heatmap_layer))
-                    heatmap.update(heatmap_layer, sensorctx, map.getZoom(), sensor);
+                if (map.hasLayer(heatmap_layer)) {
+                    if (sensor._source.status=="streaming") {
+                        heatmap.update(heatmap_layer, sensorctx, map.getZoom(), sensor);
+                    } else {
+                        heatmap.close(sensorctx);
+                    }
+                }
             };
             sensorctx.close_sensor=function () {
                 stats.close(sensorctx);
@@ -179,7 +205,7 @@ var scenarios={
             sensor_icon: function (sensor, online) {
                 var status=online?sensor._source.status:"disconnected";
                 if (sensor._source.algorithm=="crowd-counting") 
-                    return scenarios.stadium.icon[sensor._source.model][status];
+                    return scenarios.stadium.icon[sensor._source.subtype][status];
                 var lr=(sensor._source.theta>=270 || sensor._source.theta<90)?"right":"left";
                 return scenarios.stadium.icon.queue[lr][status];
             },
@@ -205,7 +231,7 @@ var scenarios={
                 map.setView(scenarios.stadium.center,page.data('zoom'));
             });
             if (order==0) layer1.addTo(map).fire('add');
-            page.data('controls').addBaseLayer(layer1,"Stadium Services");
+            page.data('controls').addBaseLayer(layer1,text["stadium services"]);
         },
         create_sensor: function (officectx, sensorctx, sensor, page, map) {
             stats.create(sensorctx, sensor, page, map, function (chart_div) {
@@ -228,7 +254,11 @@ var scenarios={
                     } else if (sensor._source.algorithm=="entrance-counting" || sensor._source.algorithm=="svcq-counting") {
                         fields.push("count.people");
                     } else if (sensor._source.algorithm=="crowd-counting") {
-                        iconloc=sensorctx.zonemap.getBounds().getCenter();
+                        try {
+                            iconloc=sensorctx.zonemap.getBounds().getCenter();
+                        } catch (e) {
+                            iconloc=null;
+                        }
                         $.each(sensor._source.zones,function (x,v) {
                             fields.push("count.zone"+v);
                         });

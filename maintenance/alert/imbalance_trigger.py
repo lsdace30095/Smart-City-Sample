@@ -2,12 +2,12 @@
 
 from db_query import DBQuery
 from trigger import Trigger
-import time
-import os
+from language import text
+from configuration import env
 
-service_interval=list(map(float,os.environ["SERVICE_INTERVAL"].split(",")))
-office=list(map(float, os.environ["OFFICE"].split(",")))
-dbhost=os.environ["DBHOST"]
+service_interval=list(map(float,env["SERVICE_INTERVAL"].split(",")))
+office=list(map(float, env["OFFICE"].split(",")))
+dbhost=env["DBHOST"]
 
 class ImbalanceTrigger(Trigger):
     def __init__(self):
@@ -15,15 +15,15 @@ class ImbalanceTrigger(Trigger):
         self._dbs=DBQuery(index="sensors",office=office,host=dbhost)
         self._dba=DBQuery(index="algorithms",office=office,host=dbhost)
 
-    def trigger(self):
-        time.sleep(service_interval[2])
+    def trigger(self, stop):
+        stop.wait(service_interval[2])
         info=[]
 
         try:
             nsensors={
-                "total": self._dbs.count("sensor:*"),
-                "streaming": self._dbs.count("status:'streaming'"),
-                "idle": self._dbs.count("status:'idle'"),
+                "total": self._dbs.count("type='camera'"),
+                "streaming": self._dbs.count("type='camera' and status='streaming'"),
+                "idle": self._dbs.count("type='camera' and status='idle'"),
             }
             nalgorithms={
                 "total": self._dba.count("name:*"),
@@ -35,7 +35,7 @@ class ImbalanceTrigger(Trigger):
         if nsensors["total"]>nsensors["streaming"]+nsensors["idle"]:
             info.append({
                 "fatal": [{ 
-                    "message": "Check sensor: #disconnected="+str(nsensors["total"]-nsensors["streaming"]-nsensors["idle"]),
+                    "message": text["check sensor"].format(nsensors["total"]-nsensors["streaming"]-nsensors["idle"]),
                     "args": nsensors,
                 }]
             })
@@ -43,7 +43,7 @@ class ImbalanceTrigger(Trigger):
         if nalgorithms["total"]>nsensors["streaming"]+nsensors["idle"]:
             info.append({
                 "warning": [{
-                    "message": "Imbalance: #analytics="+str(nalgorithms["total"])+",#sensors="+str(nsensors["streaming"]+nsensors["idle"]),
+                    "message": text("imbalance").format(nalgorithms["total"],nsensors["streaming"]+nsensors["idle"]),
                     "args": {
                         "nalgorithms": nalgorithms["total"],
                         "nsensors": nsensors["streaming"]+nsensors["idle"],

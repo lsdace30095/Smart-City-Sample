@@ -1,20 +1,17 @@
 #!/usr/bin/python3
-import traceback
+
 from db_ingest import DBIngest
 import paho.mqtt.client as mqtt
 from threading import Thread, Condition, Timer
 from signal import signal, SIGTERM
+from configuration import env
 import traceback
 import json
-import time
-import sys
-import os
 
-mqtthost = os.environ["MQTTHOST"]
-scenario = os.environ["SCENARIO"]
-dbhost = os.environ["DBHOST"]
-office = list(map(float, os.environ["OFFICE"].split(",")))
-
+mqtthost = env["MQTTHOST"]
+scenario = env["SCENARIO"]
+dbhost = env["DBHOST"]
+office = list(map(float, env["OFFICE"].split(",")))
 
 class MQTT2DB(object):
     def __init__(self):
@@ -37,7 +34,7 @@ class MQTT2DB(object):
                 self._mqtt.connect(mqtthost)
                 break
             except:
-                print(trackback.format_exc(), flush=True)
+                pass
         timer.cancel()
         print("mqtt connected", flush=True)
 
@@ -69,11 +66,14 @@ class MQTT2DB(object):
         try:
 
             r = json.loads(str(message.payload.decode("utf-8", "ignore")))
-            r.update(r["tags"])
-            del r["tags"]
-            if "real_base" not in r:
-                r["real_base"] = 0
-            r["time"] = int((r["real_base"] + r["timestamp"]) / 1000000)
+
+            if "tags" in r:
+                r.update(r["tags"])
+                del r["tags"]
+
+            if ("time" not in r) and ("real_base" in r) and ("timestamp" in r): 
+                real_base=r["real_base"] if "real_base" in r else 0
+                r["time"] = int((real_base + r["timestamp"]) / 1000000)
 
             if "objects" in r and scenario == "traffic":
                 r["nobjects"] = int(len(r["objects"]))
@@ -83,7 +83,7 @@ class MQTT2DB(object):
                 r["nobjects"] = int(max([r["count"][k] for k in r["count"]]))
 
         except:
-            print(trackback.format_exc(), flush=True)
+            print(traceback.format_exc(), flush=True)
 
         self._add1(r)
 
@@ -98,7 +98,7 @@ class MQTT2DB(object):
             try:
                 self._db.ingest_bulk(bulk)
             except:
-                print(trackback.format_exc(), flush=True)
+                print(traceback.format_exc(), flush=True)
 
 
 mqtt2db = MQTT2DB()

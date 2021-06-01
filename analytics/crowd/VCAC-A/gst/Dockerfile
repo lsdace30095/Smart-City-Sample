@@ -9,17 +9,10 @@ COPY *.py /home/
 COPY models/CSRNet_IR_model_2020R2/2 /home/models/CSRNet_IR_model_2020R2/2
 COPY VCAC-A/gst/pipeline /home/pipelines/crowd_counting
 COPY custom_transforms /home/custom_transforms
-CMD ["/home/count-crowd.py"]
-ENV PATH=${PATH}:/home/custom_transforms
+CMD  ["/home/count-crowd.py"]
+ENV  PATH=${PATH}:/home/custom_transforms
 
 ####
-ARG  USER=docker
-ARG  GROUP=docker
 ARG  UID
-ARG  GID
-## must use ; here to ignore user exist status code
-RUN  [ ${GID} -gt 0 ] && groupadd -f -g ${GID} ${GROUP}; \
-     [ ${UID} -gt 0 ] && useradd -d /home/${USER} -g ${GID} -K UID_MAX=${UID} -K UID_MIN=${UID} ${USER}; \
-     chown -R ${UID}:${GID} /home
 #USER ${UID}
 ####

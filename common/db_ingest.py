@@ -1,24 +1,15 @@
 #!/usr/bin/python3
 
-import requests
+from db_common import DBCommon
+from language_dsl import text
 import json
 
-class DBIngest(object):
+class DBIngest(DBCommon):
     def __init__(self, index, office, host):
-        super(DBIngest,self).__init__()
-        self._host=host
-        if isinstance(office,list): office='$'+('$'.join(map(str,office)))
-        self._index=index+office
+        super(DBIngest,self).__init__(index,office,host)
+        self._error=text["ingest error"]
 
-    def _check_error(self, r):
-        if r.status_code==200 or r.status_code==201: return
-        try:
-            reason=r.json()["error"]["reason"]
-        except:
-            r.raise_for_status()
-        raise Exception(reason)
-
-    def ingest_bulk(self, bulk, batch=500):
+    def ingest_bulk(self, bulk, batch=500, refresh="false"):
         ''' save bulk data to the database
             bulk: list of bulk data
         '''
@@ -35,24 +26,17 @@ class DBIngest(object):
             bulk=bulk[batch:]
                 
             cmds="\n".join([json.dumps(x) for x in cmds])+"\n"
-            r=requests.post(self._host+"/_bulk",data=cmds,headers={"content-type":"application/x-ndjson"})
-            self._check_error(r)
+            self._request(self._requests.post,self._host+"/_bulk?refresh="+refresh,data=cmds,headers={"content-type":"application/x-ndjson"})
         
-    def ingest(self, info, id1=None):
-        r=requests.put(self._host+"/"+self._index+"/_doc/"+id1,json=info) if id1 else requests.post(self._host+"/"+self._index+"/_doc",json=info)
-        self._check_error(r)
-        return r.json()
+    def ingest(self, info, id1=None, refresh="false"):
+        if id1:
+            return self._request(self._requests.put,self._host+"/"+self._index+"/_doc/"+id1+"?refresh="+refresh,json=info)
+        else:
+            return self._request(self._requests.post,self._host+"/"+self._index+"/_doc?refresh="+refresh,json=info)
 
     def update(self, _id, info, seq_no=None, primary_term=None):
         options={}
         if seq_no is not None: options["if_seq_no"]=seq_no
         if primary_term is not None: options["if_primary_term"]=primary_term
-        r=requests.post(self._host+"/"+self._index+"/_doc/"+_id+"/_update",params=options,json={"doc":info})  #ES6.8
-        #r=requests.post(self._host+"/"+self._index+"/_update/"+_id,params=options,json={"doc":info})  #ES7.4
-        self._check_error(r)
-        return r.json()
-
-    def delete(self, _id):
-        r=requests.delete(self._host+"/"+self._index+"/_doc/"+_id,headers={'Content-Type':'application/json'})
-        self._check_error(r)
-        return r.json()
+        return self._request(self._requests.post,self._host+"/"+self._index+"/_doc/"+_id+"/_update",params=options,json={"doc":info})  #ES6.8
+        #return self._request(self._requests.post,self._host+"/"+self._index+"/_update/"+_id,params=options,json={"doc":info})  #ES7.4

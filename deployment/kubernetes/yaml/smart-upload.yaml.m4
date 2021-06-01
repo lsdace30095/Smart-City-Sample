@@ -1,4 +1,3 @@
-define(`SERVICE_INTERVAL_SMART_UPLOAD',120)
 
 include(platform.m4)
 include(../../../script/loop.m4)
@@ -31,31 +30,23 @@ spec:
           image: defn(`REGISTRY_PREFIX')smtc_smart_upload:latest
           imagePullPolicy: IfNotPresent
           resources:
-            requests:
-                cpu: "100m"
             limits:
-                cpu: "200m"
+                cpu: "50m"
           env:
             - name: QUERY
-              value: "time>=eval(defn(`SERVICE_INTERVAL_SMART_UPLOAD')*1000) where objects.detection.bounding_box.x_max-objects.detection.bounding_box.x_min>0.01"
-            - name: INDEXES
-              value: "recordings,analytics"
+              value: "objects.detection.bounding_box.x_max-objects.detection.bounding_box.x_min>0.1"
             - name: OFFICE
               value: "defn(`OFFICE_LOCATION')"
             - name: DBHOST
-              value: "http://ifelse(eval(defn(`NOFFICES')>1),1,defn(`OFFICE_NAME')-db,db)-service:9200"
-            - name: SMHOST
+              value: "http://ifelse(defn(`NOFFICES'),1,db,defn(`OFFICE_NAME')-db)-service:9200"
+            - name: DBCHOST
+              value: "http://cloud-gateway-service:8080/cloud/api/db"
+            - name: STHOST
               value: "http://defn(`OFFICE_NAME')-storage-service:8080/recording"
-            - name: CLOUDHOST
-              value: "http://cloud-storage-service:8080/recording"
+            - name: STCHOST
+              value: "http://cloud-gateway-service:8080/cloud/api/upload"
             - name: SERVICE_INTERVAL
-              value: "defn(`SERVICE_INTERVAL_SMART_UPLOAD')"
-            - name: UPDATE_INTERVAL
-              value: "5"
-            - name: SEARCH_BATCH
-              value: "3000"
-            - name: UPDATE_BATCH
-              value: "500"
+              value: "30"
             - name: NO_PROXY
               value: "*"
             - name: no_proxy

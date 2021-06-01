@@ -9,17 +9,10 @@ COPY *.py /home/
 COPY models /home/models
 COPY VCAC-A/gst/pipeline /home/pipelines/entrance_counting
 COPY custom_transforms /home/custom_transforms
-CMD ["/home/count-entrance.py"]
-ENV PATH=${PATH}:/home/custom_transforms
+CMD  ["/home/count-entrance.py"]
+ENV  PATH=${PATH}:/home/custom_transforms
 
 ####
-ARG  USER=docker
-ARG  GROUP=docker
 ARG  UID
-ARG  GID
-## must use ; here to ignore user exist status code
-RUN  [ ${GID} -gt 0 ] && groupadd -f -g ${GID} ${GROUP}; \
-     [ ${UID} -gt 0 ] && useradd -d /home/${USER} -g ${GID} -K UID_MAX=${UID} -K UID_MIN=${UID} ${USER}; \
-     chown -R ${UID}:${GID} /home
 #USER ${UID}
 ####

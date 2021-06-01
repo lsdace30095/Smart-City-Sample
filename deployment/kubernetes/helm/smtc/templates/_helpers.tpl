@@ -21,13 +21,35 @@ Expand the database name.
 {{- end }}
 
 {{/*
+Extract the camera gateway.
+*/}}
+{{- define "smtc.cameraGateway" }}
+{{- if (regexMatch "-(svc|camera)$" $.Values.buildScope) }}
+{{- "enable" }}
+{{- else }}
+{{- "disable" }}
+{{- end }}
+{{- end }}
+
+{{/*
 Expand to the office db name 
 */}}
 {{- define "smtc.env.dbhost" }}
 {{- if gt (int .Values.noffices) 1 }}
-              value: {{ ( .officeName ) | printf "http://%s-db-service:9200" | quote }}
+{{- printf "http://%s-db-service:9200" .officeName }}
 {{- else }}
-              value: "http://db-service:9200"
+{{- "http://db-service:9200" }}
+{{- end }}
+{{- end }}
+
+{{/*
+Expand to the office db transport
+*/}}
+{{- define "smtc.env.dbseeds" }}
+{{- if gt (int .Values.noffices) 1 }}
+{{- printf "%s-db-service:9300" .officeName }}
+{{- else }}
+{{- "db-service:9300" }}
 {{- end }}
 {{- end }}
 
@@ -93,9 +115,9 @@ Office location
 */}}
 {{- define "smtc.env.office" -}}
 {{- if eq .scenarioName "traffic" }}
-              value: {{ index .Values.officeLocations.traffic .officeIdx | quote }}
+{{- index .Values.officeLocations.traffic .officeIdx }}
 {{- else if eq .scenarioName "stadium" }}
-              value: {{ index .Values.officeLocations.stadium .officeIdx | quote }}
+{{- index .Values.officeLocations.stadium .officeIdx }}
 {{- end }}
 {{- end }}
 
@@ -138,8 +160,15 @@ Expand the platform device name.
 */}}
 {{- define "smtc.platform.device" }}
 {{- if eq "vcac-a" ( include "smtc.platform.suffix" . ) }}
-{{- "hddl" }}
+{{- "HDDL" }}
 {{- else }}
-{{- "cpu" }}
+{{- "CPU" }}
 {{- end }}
+{{- end }}
+
+{{/*
+Extract the hostname from connector.host
+*/}}
+{{- define "smtc.connector.cloud.hostname" }}
+{{- regexReplaceAll ".*@" .Values.connector.cloudHost "" }}
 {{- end }}

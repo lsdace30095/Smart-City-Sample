@@ -21,6 +21,15 @@ looplist(`SCENARIO_NAME',defn(`SCENARIO'),`dnl
 # offices in the traffic scenario and 1 office in the stadium scenario.
 noffices: defn(`NOFFICES')
 
+# specify the high availability options for databases
+database:
+    haCloud: defn(`HA_CLOUD')
+    haOffice: defn(`HA_OFFICE')
+
+# specify the high availability options for SRS
+srs:
+    haOffice: defn(`HA_SRS_OFFICE')
+
 # nCameras specifies the number of cameras served in each office. Currently
 # support 1-8 cameras. 
 ncameras: 
@@ -55,18 +64,29 @@ loopifdef(OFFICEIDX,1,`defn(`SCENARIO_NAME')`_office'defn(`OFFICEIDX')`_location
 networkPreference: "defn(`NETWORK_PREFERENCE')"
 
 # default settings for IP camera simulation & discovery.
-discoverSimulatedCamera: true
+discoverSimulatedCamera: true 
 cameraRTSPPort:   17000
 cameraRTPPort:    27000
 cameraPortStep:   10
-discoverIPCamera: false
-cameraSubnet:
-  - "192.168.1.0/24"
-  - "192.168.2.0/24"
-  - "192.168.3.0/24"
+discoverIPCamera: false 
+discoverRTMP:     true 
+otType:           false 
 
 # optional: provide Linux user id & group permissioned to access cloud storage
 # userID is obtained using command: `$ id -u`
 # groupID is obtained using command: `$ id -g`
 userId: defn(`USERID')
 groupId: defn(`GROUPID')
+
+# optional: build scope: one of "", "cloud", or "officeN", or "cameraN"
+buildScope: ""
+
+# optional: specify connector hosts if they are from different Kubernetes clusters.
+connector:
+    cloudHost: ""
+    cloudGatewayPort: 28080
+    officeGatewayPort: 28081
+
+webrtc:
+    udpPort: 10000
+    streamingLimit: 10

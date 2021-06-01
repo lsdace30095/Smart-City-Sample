@@ -2,21 +2,21 @@
 
 from db_query import DBQuery
 from trigger import Trigger
-import time
-import os
+from language import text
+from configuration import env
 
-office=list(map(float,os.environ["OFFICE"].split(",")))
-service_interval=list(map(float,os.environ["SERVICE_INTERVAL"].split(",")))
-args=os.environ["OCCUPENCY_ARGS"].split(",")
-dbhost=os.environ["DBHOST"]
+office=list(map(float,env["OFFICE"].split(",")))
+service_interval=list(map(float,env["SERVICE_INTERVAL"].split(",")))
+args=env["OCCUPENCY_ARGS"].split(",")
+dbhost=env["DBHOST"]
 
 class OccupencyTrigger(Trigger):
    def __init__(self):
        super(OccupencyTrigger,self).__init__()
        self._db=DBQuery(index="analytics",office=office,host=dbhost)
 
-   def trigger(self):
-       time.sleep(service_interval[0])
+   def trigger(self, stop):
+       stop.wait(service_interval[0])
        objects=("",0)
        crowd=("",0)
        entrance=("",0)
@@ -48,7 +48,7 @@ class OccupencyTrigger(Trigger):
            info.append({
                "location": objects[0],
                "warning": [{
-                   "message": "Traffic busy: #objects="+str(objects[1]),
+                   "message": text["traffic busy"].format(objects[1]),
                    "args": {
                        "nobjects": objects[1],
                    },
@@ -58,7 +58,7 @@ class OccupencyTrigger(Trigger):
            info.append({
                "location": entrance[0],
                "warning": [{
-                   "message": "Entrence crowded: #people="+str(entrance[1]),
+                   "message": text["entrance crowded"].format(entrance[1]),
                    "args": {
                        "occupency": entrance[1],
                    }
@@ -68,7 +68,7 @@ class OccupencyTrigger(Trigger):
            info.append({
                "location": svcq[0],
                "warning": [{
-                   "message": "Service slow: #queue="+str(svcq[1]),
+                   "message": text["service slow"].format(svcq[1]),
                    "args": {
                        "occupency": svcq[1],
                    }
@@ -78,7 +78,7 @@ class OccupencyTrigger(Trigger):
            info.append({
                "location": crowd[0],
                "warning": [{
-                   "message": "Zone crowded: #seats="+str(crowd[1]),
+                   "message": text["seat crowded"].format(crowd[1]),
                    "args": {
                        "nseats": crowd[1],
                    }

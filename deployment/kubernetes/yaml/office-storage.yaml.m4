@@ -49,19 +49,21 @@ spec:
             - name: OFFICE
               value: "defn(`OFFICE_LOCATION')"
             - name: DBHOST
-              value: "http://ifelse(eval(defn(`NOFFICES')>1),1,defn(`OFFICE_NAME')-db,db)-service:9200"
+              value: "http://ifelse(defn(`NOFFICES'),1,db,defn(`OFFICE_NAME')-db)-service:9200"
             - name: INDEXES
               value: "recordings,analytics"
             - name: RETENTION_TIME
               value: "3600"
             - name: SERVICE_INTERVAL
-              value: "3600"
+              value: "1800"
             - name: WARN_DISK
-              value: "75"
+              value: "70"
             - name: FATAL_DISK
-              value: "85"
+              value: "75"
             - name: HALT_REC
-              value: "95"
+              value: "80"
+            - name: THUMBNAIL_CACHE
+              value: "50"
             - name: NO_PROXY
               value: "*"
             - name: no_proxy

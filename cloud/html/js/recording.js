@@ -8,16 +8,6 @@ $("#pg-recording").on(":initpage", function(e, queries, office) {
         page.find("[layout4]").toggle();
     });
 
-    var index="recordings,analytics";
-    $("#cloudButton").unbind('click').click(function () {
-        if ($(this).find("i").toggleClass("fi-cloud").toggleClass("fi-video").hasClass("fi-cloud")) {
-            $("#homeSearch").data('index',index);
-        } else {
-            $("#homeSearch").data('index',index.split(",").join("_c,")+"_c");
-        }
-        $("#homeSearch").trigger($.Event("keydown",{keyCode:13}));
-    });
-
     /* update home button */   
     $("#homeButton").unbind('click').click(function () {
         selectPage('home');
@@ -25,15 +15,21 @@ $("#pg-recording").on(":initpage", function(e, queries, office) {
 
     /* enable recording queries */
     var monitor=0;
-    $("#homeSearch").data('index',index).data('office',office).data('invoke',function (queries) {
+    $("#homeSearch").data('index','recordings').data('office',office).data('invoke',function (queries) {
         var plist=page.find("[play-list]");
         plist.empty();
         apiHost.search($("#homeSearch").data('index'),queries,office).then(function (data) {
+            
+            if ("status" in data)
+                $("[hint-panel]").trigger(":error", [data.status]);
+
             data.response.sort(function(a,b){return a._source.time-b._source.time});
             $.each(data.response, function (k,v) {
                 var time=new Date(v._source.time).toLocaleString();
-                v._source.path="recording/"+v._source.path+'?'+$.param({office:office.lat+","+office.lon});
-                var line=$('<tr><td class="no-padding"><a href="javascript:void(0)"><img src="'+v._source.path.replace('mp4?','mp4.png?')+'" draggable="true"/><figcaption class="xx-small">'+time+' <pre>'+v._source.path+'</pre></figcaption></a></td></tr>');
+                v._source.office=office;
+                v._source.path=api_host_url(office,"recording/"+v._source.path);
+                var address=("address" in v._source)?v._source.address:"";
+                var line=$('<tr><td class="no-padding"><a href="javascript:void(0)"><img src="'+v._source.path.replace(/\.mp4$/,".mp4.png")+'?size=640:360" draggable="true"/><figcaption class="xx-small">'+address+' '+time+'</figcaption></a></td></tr>');
                 line.find("img").css({width:plist.width()+"px"});
                 line.on("dragstart",function (e) {
                     e.originalEvent.dataTransfer.setData("application/json",JSON.stringify(v));
@@ -50,7 +46,7 @@ $("#pg-recording").on(":initpage", function(e, queries, office) {
                 plist.append(line);
             });
         }).catch(function (e) {
-            $("[hint-panel]").trigger(":error", [e.statusText]);
+            $("[hint-panel]").trigger(":error", [text["connection error"]]);
         });
     });
 
@@ -90,10 +86,24 @@ $("#pg-recording [layout1] video").on("drop",function (e) {
     var page=$(this);
     var doc=JSON.parse(e.originalEvent.dataTransfer.getData('application/json'));
 
-    page.parent().find("div").text(new Date(doc._source.time).toLocaleString());
+    apiHost.search("sensors","_id='"+doc._source.sensor+"'",doc._source.office,1).then(function (data) {
+        page.parent().find("div").text(data.response[0]._source.address+" "+new Date(doc._source.time).toLocaleString());
+    });
     page.find("source").prop('src',doc._source.path);
-    console.log(doc);
     draw_analytics(page, doc);
 }).on("dragover",function (e) {
     e.preventDefault();
 });
+
+$("#cloudButton").click(function () {
+    selectPage("recording",['sensor=*',""]);
+}).on(":initwatcher", function () {
+    var button=$(this);
+    var timer=setInterval(function () {
+        apiHost.search("recordings","sensor=*","",1).then(function (data) {
+            if (data.response.length==0) return;
+            clearInterval(timer);
+            button.show();
+        });
+    }, 5000);
+}).hide();

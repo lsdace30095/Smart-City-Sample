@@ -2,10 +2,14 @@
 {{- range $scenarioIdx, $scenarioName := $.Values.scenario }}
 {{- $args := dict "scenarioName" $scenarioName "Values" $.Values }}
 {{- range $officeIdx := until ( int ( include "smtc.noffices" $args ) ) }}
-{{- $officeName := printf "%s-office%d" $scenarioName $officeIdx }}
+{{- $officeName := printf "%s-office%d" $scenarioName (add $officeIdx 1) }}
+{{- $scope1 := printf "office%d-svc" (add $officeIdx 1) }}
+{{- if contains $.Values.buildScope $scope1 }}
 
 {{- $args := dict "scenarioName" $scenarioName "Values" $.Values }}
 {{- $nanalytics := include "smtc.nanalytics" $args }}
+{{- $args := dict "Values" $.Values }}
+{{- $cameraGateway := include "smtc.cameraGateway" $args }}
 
 {{- if eq $scenarioName "traffic" }}
 
@@ -26,7 +30,7 @@ spec:
         app: {{ $officeName }}-analytics-traffic
     spec:
       enableServiceLinks: false
-      {{- if $.Values.discoverIPCamera }}
+      {{- if and ($.Values.discoverIPCamera) ( eq $cameraGateway "disable" ) }}
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
       {{- end }}
@@ -37,12 +41,18 @@ spec:
           env:
             - name: OFFICE
               {{- $args := dict "scenarioName" $scenarioName "Values" $.Values "officeIdx" $officeIdx }}
-              {{- include "smtc.env.office" $args }}
+              value: {{ include "smtc.env.office" $args | quote }}
             - name: DBHOST
               {{- $args := dict "officeName" $officeName "Values" $.Values }}
-              {{- include "smtc.env.dbhost" $args }}
+              value: {{ include "smtc.env.dbhost" $args | quote }}
             - name: MQTTHOST
               value: "{{ $officeName }}-mqtt-service"
+            - name: MQTT_TOPIC
+              {{- if (int $.Values.otType) }}
+              value: "relayanalytics"
+              {{- else }}
+              value: "analytics"
+              {{- end }}
             - name: STHOST
               value: "http://{{ $officeName }}-storage-service:8080/api/upload"
             - name: EVERY_NTH_FRAME
@@ -64,6 +74,7 @@ spec:
             {{- include "smtc.platform.mounts" $ }}
       initContainers:
             - image: busybox:latest
+              imagePullPolicy: IfNotPresent
               name: init
               command: ["/bin/chown","{{ $.Values.userId }}:{{ $.Values.groupId }}","/tmp/rec"]
               volumeMounts:
@@ -100,7 +111,7 @@ spec:
         app: {{ $officeName }}-analytics-entrance
     spec:
       enableServiceLinks: false
-      {{- if $.Values.discoverIPCamera }}
+      {{- if and ($.Values.discoverIPCamera) ( eq $cameraGateway "disable" ) }}
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
       {{- end }}
@@ -111,12 +122,18 @@ spec:
           env:
             - name: OFFICE
               {{- $args := dict "scenarioName" $scenarioName "Values" $.Values "officeIdx" $officeIdx }}
-              {{- include "smtc.env.office" $args }}
+              value: {{ include "smtc.env.office" $args | quote }}
             - name: DBHOST
               {{- $args := dict "officeName" $officeName "Values" $.Values }}
-              {{- include "smtc.env.dbhost" $args }}
+              value: {{ include "smtc.env.dbhost" $args | quote }}
             - name: MQTTHOST
               value: "{{ $officeName }}-mqtt-service"
+            - name: MQTT_TOPIC
+              {{- if (int $.Values.otType) }}
+              value: "relayanalytics"
+              {{- else }}
+              value: "analytics"
+              {{- end }}
             - name: STHOST
               value: "http://{{ $officeName }}-storage-service:8080/api/upload"
             - name: EVERY_NTH_FRAME
@@ -138,6 +155,7 @@ spec:
             {{- include "smtc.platform.mounts" $ }}
       initContainers:
             - image: busybox:latest
+              imagePullPolicy: IfNotPresent
               name: init
               command: ["/bin/chown","{{ $.Values.userId }}:{{ $.Values.groupId }}","/tmp/rec"]
               volumeMounts:
@@ -172,7 +190,7 @@ spec:
         app: {{ $officeName }}-analytics-crowd
     spec:
       enableServiceLinks: false
-      {{- if $.Values.discoverIPCamera }}
+      {{- if and ($.Values.discoverIPCamera) ( eq $cameraGateway "disable" ) }}
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
       {{- end }}
@@ -183,12 +201,14 @@ spec:
           env:
             - name: OFFICE
               {{- $args := dict "scenarioName" $scenarioName "Values" $.Values "officeIdx" $officeIdx }}
-              {{- include "smtc.env.office" $args }}
+              value: {{ include "smtc.env.office" $args | quote }}
             - name: DBHOST
               {{- $args := dict "officeName" $officeName "Values" $.Values }}
-              {{- include "smtc.env.dbhost" $args }}
+              value: {{ include "smtc.env.dbhost" $args | quote }}
             - name: MQTTHOST
               value: "{{ $officeName }}-mqtt-service"
+            - name: MQTT_TOPIC
+              value: "analytics"
             - name: STHOST
               value: "http://{{ $officeName }}-storage-service:8080/api/upload"
             - name: EVERY_NTH_FRAME
@@ -210,6 +230,7 @@ spec:
             {{- include "smtc.platform.mounts" $ }}
       initContainers:
             - image: busybox:latest
+              imagePullPolicy: IfNotPresent
               name: init
               command: ["/bin/chown","{{ $.Values.userId }}:{{ $.Values.groupId }}","/tmp/rec"]
               volumeMounts:
@@ -244,7 +265,7 @@ spec:
         app: {{ $officeName }}-analytics-svcq
     spec:
       enableServiceLinks: false
-      {{- if $.Values.discoverIPCamera }}
+      {{- if and ($.Values.discoverIPCamera) ( eq $cameraGateway "disable" ) }}
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
       {{- end }}
@@ -255,12 +276,18 @@ spec:
           env:
             - name: OFFICE
               {{- $args := dict "scenarioName" $scenarioName "Values" $.Values "officeIdx" $officeIdx }}
-              {{- include "smtc.env.office" $args }}
+              value: {{ include "smtc.env.office" $args | quote }}
             - name: DBHOST
               {{- $args := dict "officeName" $officeName "Values" $.Values }}
-              {{- include "smtc.env.dbhost" $args }}
+              value: {{ include "smtc.env.dbhost" $args | quote }}
             - name: MQTTHOST
               value: "{{ $officeName }}-mqtt-service"
+            - name: MQTT_TOPIC
+              {{- if (int $.Values.otType) }}
+              value: "relayanalytics"
+              {{- else }}
+              value: "analytics"
+              {{- end }}
             - name: STHOST
               value: "http://{{ $officeName }}-storage-service:8080/api/upload"
             - name: EVERY_NTH_FRAME
@@ -282,6 +309,7 @@ spec:
             {{- include "smtc.platform.mounts" $ }}
       initContainers:
             - image: busybox:latest
+              imagePullPolicy: IfNotPresent
               name: init
               command: ["/bin/chown","{{ $.Values.userId }}:{{ $.Values.groupId }}","/tmp/rec"]
               volumeMounts:
@@ -299,6 +327,8 @@ spec:
           {{- include "smtc.platform.volumes" $ }}
       {{ include "smtc.platform.accel-selector" $ }}
 {{- end }}
+{{- end }}
+
 ---
 {{- end }}
 {{- end }}

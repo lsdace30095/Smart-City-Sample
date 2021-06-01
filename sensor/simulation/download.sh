@@ -3,7 +3,7 @@
 DIR=$(dirname $(readlink -f "$0"))
 IFS="," read -r -a SCENARIOS <<< "${2:-traffic}"
 
-FFMPEG_IMAGE="openvisualcloud/xeon-centos76-media-ffmpeg:20.1"
+FFMPEG_IMAGE="openvisualcloud/xeon-centos7-media-ffmpeg:21.3.1"
 CLIPS_traffic=($(grep _traffic "$DIR"/streamlist.txt))
 CLIPS_stadium=($(grep -v _traffic "$DIR"/streamlist.txt))
 
@@ -24,7 +24,7 @@ for scenario in ${SCENARIOS[@]}; do
             if test "$reply" = "accept"; then
                 echo "Downloading..."
                 tmp="tmp_$clip_name"
-                wget -q -U "XXX YYY" -O "$DIR/archive/$tmp" "$url"
+                wget --timeout=5 --tries=inf -q -U "XXX YYY" -O "$DIR/archive/$tmp" "$url"
                 docker run --rm -u $(id -u):$(id -g) -v "$DIR/archive:/mnt:rw" -it ${FFMPEG_IMAGE} ffmpeg -i /mnt/$tmp -vf scale=1280:720 -pix_fmt yuv420p -c:v libx264 -profile:v baseline -x264-params keyint=30:bframes=0 -c:a aac -f mp4 /mnt/$clip_mp4
                 rm -f "$DIR/archive/$tmp"
             else
